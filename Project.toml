@@ -3,6 +3,9 @@ uuid = "59040a2c-5e82-4c13-ac8f-a77670789620"
 authors = ["Johannes Fleck <jofleck.work@gmail.com>"]
 version = "0.1.0"
 
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+
 [compat]
 julia = "1.5"
 
