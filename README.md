@@ -10,7 +10,7 @@
 
 [TAXSIM](https://taxsim.nber.org) is a program of the National Bureau of Economic Research (NBER) which calculates liabilities under US federal and state income tax laws. It can be accessed by uploading tax filer information to the NBER's TAXSIM server. The program then computes a number of variables (income taxes, tax credits, etc.) and returns them.
 
-`Taxsim.jl` exchanges data between the Julia workspace and the server. Its function `taxsim32` supports [TAXSIM version 32](https://taxsim.nber.org/taxsim32/) and future versions will be included.
+`Taxsim.jl` exchanges data between the Julia workspace and the server. Its function `taxsim32` supports the latest [TAXSIM version 32](https://taxsim.nber.org/taxsim32/). Future versions will be included.
 
 #### Acknowledgments
 
@@ -37,14 +37,14 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 
 #### Keyword Arguments
 
-- `connection` choose either `"FTP"` or `"SSH"`. Defaults to `"FTP"`.
+- `connection` choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"`.
 - `full` request the full list of TAXSIM return variables v1 to v42. Defaults to `false` which returns v1 to v9.
 - `long_names` name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v42). Defaults to `false`.
 
 #### Output
 
 - Data frame with requested TAXSIM return variables. Column types are either Integer or Float.
-- If `df` does not include `state` or if `state = 0`, the returned data frame does not include v30 to v42.
+- If `df` does not include `state` or if `state = 0`, the data frame returned by a `full` request does not include v30 to v41.
 - Observations are ordered as in `df` so `hcat(df, df_output, makeunique=true)` merges all variables of the input and output data frames.
 
 ### Examples

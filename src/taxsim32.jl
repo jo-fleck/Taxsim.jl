@@ -104,7 +104,7 @@ function taxsim32(df; connection = "FTP", full = false, long_names = false)
 
     select!(df, Not(:idtl))
 
-    if sum(contains.("state", names(df))) == 0 select!(df_res, Not(names(df_res)[30:end])) end # Drop empty state vars
+    if sum(occursin.("state", names(df))) == 0 || (sum(occursin.("state", names(df))) == 1 && df[1, :state] == 0) select!(df_res, Not(names(df_res)[30:end])) end # Drop empty state if no state or state = 0 in df
 
     return df_res
 end
