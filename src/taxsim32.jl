@@ -12,36 +12,48 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 
 #### Keyword Arguments
 
-- `connection`: choose either `"FTP"` or `"SSH"`. Defaults to `"FTP"`.
-- `full`: request the full list of TAXSIM return variables v1 to v42. Defaults to `false` which returns v1 to v9.
-- `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v42). Defaults to `false`.
+- `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"`.
+- `full`: request the full list of TAXSIM return variables v1 to v41. Defaults to `false` which returns v1 to v9.
+- `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v41). Defaults to `false`.
 
 #### Output
 
 - Data frame with requested TAXSIM return variables. Column types are either Integer or Float.
-- If `df` does not include `state` or if `state = 0`, then the returned data frame does not include v30 to v42.
+- If `df` does not include `state` or if `state = 0`, the data frame returned by a `full` request does not include v30 to v41.
 - Observations are ordered as in `df` so `hcat(df, df_output, makeunique=true)` merges all variables of the input and output data frames.
 
-#### Examples
+### Examples
 
 ```julia-repl
 using DataFrames, Taxsim
 
-df_input_small = DataFrame(year=1980, state=5, mstat=2, ltcg=100000)
-1×4 DataFrame
-│ Row │ year  │ state │ mstat │ ltcg   │
-│     │ Int64 │ Int64 │ Int64 │ Int64  │
-├─────┼───────┼───────┼───────┼────────┤
-│ 1   │ 1980  │ 5     │ 2     │ 100000 │
+df_small_input = DataFrame(year=1980, mstat=2, ltcg=100000)
+1×3 DataFrame
+│ Row │ year  │ mstat │ ltcg   │
+│     │ Int64 │ Int64 │ Int64  │
+├─────┼───────┼───────┼────────┤
+│ 1   │ 1980  │ 2     │ 100000 │
 
-df_output1 = taxsim32(df_input_small)
+df_small_output_default = taxsim32(df_small_input)
 1×9 DataFrame
 │ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │
 │     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │
 ├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
-│ 1   │ 0.0      │ 1980  │ 5     │ 10701.2 │ 4493.8  │ 0.0     │ 17.8    │ 11.0    │ 12.0    │
+│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.0    │
 
-df_output2 = taxsim32(df_input_small, connection="SSH", full=true, long_lables=true);
+df_small_output_full = taxsim32(df_small_input, connection = "SSH", full=true)
+1×29 DataFrame
+│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v25     │
+│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │
+├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼
+│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │
+
+df_small_output_names = taxsim32(df_small_input, long_names=true)
+1×9 DataFrame
+│ Row │ Case ID │ Year  │ State │ Federal income tax liability including capital gains rates, surtaxes, AMT and refundable and non-refundable credits │ ... │ federal marginal rate │
+│     │ Float64 │ Int64 │ Int64 │ Float64                                                                                                             │ ... │ Float64               │
+├─────┼─────────┼───────┼───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┼─
+│ 1   │ 0.0     │ 1980  │ 0     │ 10920.0                                                                                                             │ ...  │ 20.0                 │
 
 ```
 """
