@@ -66,8 +66,14 @@ end
 N = 10000
 df_small_stateN = DataFrame(year=repeat([1980],inner=N), mstat=repeat([2],inner=N), ltcg=repeat([100000],inner=N), state=repeat([1],inner=N))
 
-@testset "N filer output" begin
-    df_small_stateN_out = taxsim32(df_small_stateN)
-    @test df_small_stateN_out.fiitax[N] == 10920.0
-    @test df_small_stateN_out.siitax[N] == 1119.0
+@testset "N filer output: SSH connection" begin
+    df_small_stateN_out_ssh = taxsim32(df_small_stateN, connection = "SSH")
+    @test df_small_stateN_out_ssh.fiitax[N] == 10920.0
+    @test df_small_stateN_out_ssh.siitax[N] == 1119.0
+end
+
+@testset "N filer output: FTP connection" begin
+    df_small_stateN_out_ftp = taxsim32(df_small_stateN)
+    @test df_small_stateN_out_ftp.fiitax[N] == 10920.0
+    @test df_small_stateN_out_ftp.siitax[N] == 1119.0
 end
