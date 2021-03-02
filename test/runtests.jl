@@ -53,15 +53,14 @@ df_small_state = DataFrame(year=1980, mstat=2, pwages=0, ltcg=100000, state=1)
     @test df_small_state_out.srate[1] == 4.0
 end
 
-df_small_state2= DataFrame(year=1981, mstat=1, pwages=100000, ltcg=0, state=5)
-append!(df_small_state2, df_small_state)
+df_small_state2 = DataFrame(year=[1980, 1981], mstat=[2,1], pwages=[0,100000], ltcg=[100000,0], state=[1,5])
 
 @testset "2 filer output" begin
     df_small_state2_out = taxsim32(df_small_state2)
-    @test df_small_state2_out.fiitax[1] == 38344.85
-    @test df_small_state2_out.siitax[1] == 9559.5
-    @test df_small_state2_out.fiitax[2] == 10920.0
-    @test df_small_state2_out.siitax[2] == 1119.0
+    @test df_small_state2_out.fiitax[1] == 10920.0
+    @test df_small_state2_out.siitax[1] == 1119.0
+    @test df_small_state2_out.fiitax[2] == 38344.85
+    @test df_small_state2_out.siitax[2] == 9559.5
 end
 
 N = 10000
