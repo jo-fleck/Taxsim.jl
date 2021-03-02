@@ -98,14 +98,14 @@ function taxsim32(df; connection = "FTP", full = false, long_names = false)
         io_out = IOBuffer();
         if Sys.isapple() == true || Sys.islinux() == true
             try
-                run(pipeline(`ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no taxsimssh@taxsimssh.nber.org`, stdin=seekstart(CSV.write(IOBuffer(), df)), stdout=io_out))
+                run(pipeline(`ssh -T -o ConnectTimeout=60 -o StrictHostKeyChecking=no taxsimssh@taxsimssh.nber.org`, stdin=seekstart(CSV.write(IOBuffer(), df)), stdout=io_out))
             catch
                 @error "Cannot connect to the TAXSIM server via SSH"
             end
         end
         if Sys.iswindows() == true
             try
-                run(pipeline(`! ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no taxsimssh@taxsimssh.nber.org`, stdin=seekstart(CSV.write(IOBuffer(), df)), stdout=io_out))
+                run(pipeline(`! ssh -T -o ConnectTimeout=60 -o StrictHostKeyChecking=no taxsimssh@taxsimssh.nber.org`, stdin=seekstart(CSV.write(IOBuffer(), df)), stdout=io_out))
             catch
                 @error "Cannot connect to the TAXSIM server via SSH"
             end
