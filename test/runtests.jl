@@ -7,9 +7,9 @@ using DataFrames
 
 array = Array{Int64,2}(undef, 2, 3)
 df_empty = DataFrame(year=[], mstat=[], ltcg=[])
-df_faulty_name = DataFrame(yyear=1980, mstat=2, ltcg=100000)
-df_missing = DataFrame(year=1980, mstat=2, ltcg=missing)
-df_string = DataFrame(year=1980, mstat="married", ltcg=100000)
+df_faulty_name = DataFrame(yyear=1970, mstat=2, ltcg=100000)
+df_missing = DataFrame(year=1970, mstat=2, ltcg=missing)
+df_string = DataFrame(year=1970, mstat="married", ltcg=100000)
 
 @testset "Inputs" begin
     @test_throws ErrorException("Input must be a data frame") taxsim32(array)
@@ -35,4 +35,40 @@ end
     @test typeof(df_default_out_ftp) == DataFrame
     df_full_out_ftp = taxsim32(df_small, full = true)
     @test typeof(df_full_out_ftp) == DataFrame
+end
+
+# Output tests
+
+df_small_state = DataFrame(year=1980, mstat=2, pwages=0, ltcg=100000, state=1)
+
+@testset "1 filer output" begin
+    df_small_out = taxsim32(df_small)
+    @test df_small_out.fiitax[1] == 16700.04
+    @test df_small_out.frate[1] == 46.12
+    @test df_small_out.ficar[1] == 10.0
+    df_small_state_out = taxsim32(df_small_state)
+    @test df_small_state_out.fiitax[1] == 10920.0
+    @test df_small_state_out.frate[1] == 20.0
+    @test df_small_state_out.siitax[1] == 1119.0
+    @test df_small_state_out.srate[1] == 4.0
+end
+
+df_small_state2= DataFrame(year=1981, mstat=1, pwages=100000, ltcg=0, state=5)
+append!(df_small_state2, df_small_state)
+
+@testset "2 filer output" begin
+    df_small_state2_out = taxsim32(df_small_state2)
+    @test df_small_state2_out.fiitax[1] == 38344.85
+    @test df_small_state2_out.siitax[1] == 9559.5
+    @test df_small_state2_out.fiitax[2] == 10920.0
+    @test df_small_state2_out.siitax[2] == 1119.0
+end
+
+N = 10000
+df_small_stateN = DataFrame(year=repeat([1980],inner=N), mstat=repeat([2],inner=N), ltcg=repeat([100000],inner=N), state=repeat([1],inner=N))
+
+@testset "N filer output" begin
+    df_small_stateN_out = taxsim32(df_small_stateN)
+    @test df_small_stateN_out.fiitax[N] == 10920.0
+    @test df_small_stateN_out.siitax[N] == 1119.0
 end
