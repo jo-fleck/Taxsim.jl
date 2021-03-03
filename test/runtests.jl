@@ -63,7 +63,7 @@ df_small_state2 = DataFrame(year=[1980, 1981], mstat=[2,1], pwages=[0,100000], l
     @test df_small_state2_out.siitax[2] == 9559.5
 end
 
-N = 10000
+N = 1000
 df_small_stateN = DataFrame(year=repeat([1980],inner=N), mstat=repeat([2],inner=N), ltcg=repeat([100000],inner=N), state=repeat([1],inner=N))
 
 @testset "N filer output: SSH connection" begin
