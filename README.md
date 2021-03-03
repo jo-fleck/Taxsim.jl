@@ -20,7 +20,7 @@ Reach out to Daniel with questions on TAXSIM and follow his request on citation 
 
 ### Installation and Instructions
 
-The package is in the general registry and can be installed via Julia's package manager using one of two options:
+`Taxsim.jl` can be installed via Julia's package manager using one of two options:
 
 - REPL: `] add Taxsim`
 - Pkg functions: `using Pkg; Pkg.add("Taxsim")`
@@ -37,9 +37,9 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 
 #### Keyword Arguments
 
-- `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"`.
+- `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"` (which is faster).
 - `full`: request the full list of TAXSIM return variables v1 to v41. Defaults to `false` which returns v1 to v9.
-- `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v41). Defaults to `false`.
+- `long_names`: name all return variables with their long TAXSIM names. Defaults to `false` which returns abbreviated names for v1 to v9 and no names for v10 to v41.
 
 #### Output
 
@@ -80,6 +80,21 @@ df_small_output_names = taxsim32(df_small_input, long_names=true)
 ├─────┼─────────┼───────┼───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┼─
 │ 1   │ 0.0     │ 1980  │ 0     │ 10920.0                                                                                                             │ ...  │ 20.0                 │
 
+N = 10000
+df_small_stateN = DataFrame(year=repeat([1980],inner=N), mstat=repeat([2],inner=N), ltcg=repeat([100000],inner=N), state=repeat([1],inner=N))
+df_small_stateN_out = taxsim32(df_small_stateN)
+10000×9 DataFrame
+   Row │ taxsimid  year   state  fiitax   siitax   fica     frate    srate    ficar   
+       │ Float64   Int64  Int64  Float64  Float64  Float64  Float64  Float64  Float64
+───────┼──────────────────────────────────────────────────────────────────────────────
+     1 │      1.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+     2 │      2.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+     3 │      3.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+     4 │      4.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+   ⋮   │    ⋮        ⋮      ⋮       ⋮        ⋮        ⋮        ⋮        ⋮        ⋮
+  9998 │   9998.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+  9999 │   9999.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+ 10000 │  10000.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
 ````
 
 ### Troubleshooting
@@ -89,6 +104,8 @@ Expect three different kinds of errors
 1. **Input Error** Adjust `df` so it meets the required column types and names.
 2. **Connection Error** Indicates that `taxsim32` cannot connect to the TAXSIM server. Try a different connection option. If this does not help, check your internet and network settings and contact your network administrator - you're probably behind a restrictive firewall.
 3. **Server Error** Forwarded from the TAXSIM server. Either a faulty `df` passed the input tests or TAXSIM cannot compute the tax variables for some other reason (which the error message hopefully helps to identify).
+
+Please file an issue if you experience problems with large input data frames (server non-response, truncated return data frames, etc).
 
 ### Scheduled Updates
 

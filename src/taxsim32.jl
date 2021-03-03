@@ -55,6 +55,21 @@ df_small_output_names = taxsim32(df_small_input, long_names=true)
 ├─────┼─────────┼───────┼───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┼─
 │ 1   │ 0.0     │ 1980  │ 0     │ 10920.0                                                                                                             │ ...  │ 20.0                 │
 
+N = 10000
+df_small_stateN = DataFrame(year=repeat([1980],inner=N), mstat=repeat([2],inner=N), ltcg=repeat([100000],inner=N), state=repeat([1],inner=N))
+df_small_stateN_out = taxsim32(df_small_stateN)
+10000×9 DataFrame
+   Row │ taxsimid  year   state  fiitax   siitax   fica     frate    srate    ficar
+       │ Float64   Int64  Int64  Float64  Float64  Float64  Float64  Float64  Float64
+───────┼──────────────────────────────────────────────────────────────────────────────
+     1 │      1.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+     2 │      2.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+     3 │      3.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+     4 │      4.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+   ⋮   │    ⋮        ⋮      ⋮       ⋮        ⋮        ⋮        ⋮        ⋮        ⋮
+  9998 │   9998.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+  9999 │   9999.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+ 10000 │  10000.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
 ```
 """
 function taxsim32(df; connection = "FTP", full = false, long_names = false)
@@ -69,10 +84,14 @@ function taxsim32(df; connection = "FTP", full = false, long_names = false)
         if (eltype(df[!, i]) == Int || eltype(df[!, i]) == Float64 || eltype(df[!, i]) == Float32 || eltype(df[!, i]) == Float16) == false error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
     end
 
+    # Add taxsimid column if not included and specify result request
+    if sum(occursin.("taxsimid", names(df))) == 0 insertcols!(df, 1, :taxsimid => 1:size(df,1)) end
+
+    insertcols!(df, size(df,2)+1, :idtl => 0)
     if full == true
-        insertcols!(df, size(df,2)+1, :idtl => 12)
+        df[end, :idtl] = 12
     else
-        insertcols!(df, size(df,2)+1, :idtl => 10)
+        df[end, :idtl] = 10
     end
 
     if connection == "SSH"
@@ -86,7 +105,7 @@ function taxsim32(df; connection = "FTP", full = false, long_names = false)
         end
         if Sys.iswindows() == true
             try
-                run(pipeline(`! ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no taxsimssh@taxsimssh.nber.org`, stdin=seekstart(CSV.write(IOBuffer(), df)), stdout=io_out))
+                run(pipeline(`ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no taxsimssh@taxsimssh.nber.org`, stdin=seekstart(CSV.write(IOBuffer(), df)), stdout=io_out))
             catch
                 @error "Cannot connect to the TAXSIM server via SSH"
             end
@@ -114,7 +133,7 @@ function taxsim32(df; connection = "FTP", full = false, long_names = false)
         end
     end
 
-    select!(df, Not(:idtl))
+    select!(df, Not([:taxsimid, :idtl]))
 
     if sum(occursin.("state", names(df))) == 0 || (sum(occursin.("state", names(df))) == 1 && df[1, :state] == 0) select!(df_res, Not(names(df_res)[30:end])) end # Drop empty state if no state or state = 0 in df
 
