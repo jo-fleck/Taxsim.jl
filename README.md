@@ -20,7 +20,7 @@ Reach out to Daniel with questions on TAXSIM and follow his request on citation 
 
 ### Installation and Instructions
 
-The package is in the general registry and can be installed via Julia's package manager using one of two options:
+`Taxsim.jl` can be installed via Julia's package manager using one of two options:
 
 - REPL: `] add Taxsim`
 - Pkg functions: `using Pkg; Pkg.add("Taxsim")`
@@ -37,9 +37,9 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 
 #### Keyword Arguments
 
-- `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"`.
+- `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"` (which is faster).
 - `full`: request the full list of TAXSIM return variables v1 to v41. Defaults to `false` which returns v1 to v9.
-- `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v41). Defaults to `false`.
+- `long_names`: name all return variables with their long TAXSIM names. Defaults to `false` which returns abbreviated names for v1 to v9 and no names for v10 to v41.
 
 #### Output
 
@@ -104,6 +104,8 @@ Expect three different kinds of errors
 1. **Input Error** Adjust `df` so it meets the required column types and names.
 2. **Connection Error** Indicates that `taxsim32` cannot connect to the TAXSIM server. Try a different connection option. If this does not help, check your internet and network settings and contact your network administrator - you're probably behind a restrictive firewall.
 3. **Server Error** Forwarded from the TAXSIM server. Either a faulty `df` passed the input tests or TAXSIM cannot compute the tax variables for some other reason (which the error message hopefully helps to identify).
+
+Please file an issue if you experience problems with large input data frames (server non-response, truncated return data frames, etc).
 
 ### Scheduled Updates
 
