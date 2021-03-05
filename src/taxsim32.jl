@@ -72,24 +72,31 @@ df_small_stateN_out = taxsim32(df_small_stateN)
  10000 │  10000.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
 ```
 """
-function taxsim32(df; connection = "FTP", full = false, long_names = false)
+function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
 
     # Input checks
-    if typeof(df) != DataFrame error("Input must be a data frame") end
-    if isempty(df) == true error("Input data frame is empty") end
+    if typeof(df_in) != DataFrame error("Input must be a data frame") end
+    if isempty(df_in) == true error("Input data frame is empty") end
     TAXSIM32_vars = ["taxsimid","year","state","mstat","page","sage","depx","dep13","dep17","dep18","pwages","swages","dividends","intrec","stcg","ltcg","otherprop","nonprop","pensions","gssi","ui","transfers","rentpaid","rentpaid","otheritem","childcare","mortgage","scorp","pbusinc","pprofinc","sbusinc","sprofinc"];
-    for (i, input_var) in enumerate(names(df))
+    for (i, input_var) in enumerate(names(df_in))
         if (input_var in TAXSIM32_vars) == false error("Input contains \"" * input_var *"\" which is not an allowed TAXSIM 32 variable name") end
-        if any(ismissing.(df[!, i])) == true error("Input contains \"" * input_var *"\" with missing(s) which TAXSIM does not accept") end
-        if (eltype(df[!, i]) == Int || eltype(df[!, i]) == Float64 || eltype(df[!, i]) == Float32 || eltype(df[!, i]) == Float16) == false error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
+        if any(ismissing.(df_in[!, i])) == true error("Input contains \"" * input_var *"\" with missing(s) which TAXSIM does not accept") end
+        if (eltype(df_in[!, i]) == Int || eltype(df_in[!, i]) == Float64 || eltype(df_in[!, i]) == Float32 || eltype(df_in[!, i]) == Float16) == false error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
     end
+
+    df = deepcopy(df_in)
 
     # Add taxsimid column if not included and specify result request
     if sum(occursin.("taxsimid", names(df))) == 0 insertcols!(df, 1, :taxsimid => 1:size(df,1)) end
 
     insertcols!(df, size(df,2)+1, :idtl => 0)
     if full == true
-        df[end, :idtl] = 12
+        if size(df,1) == 1
+            df[end, :idtl] = 12
+        else
+            df[1:end-1, :idtl] = 2
+            df[end, :idtl] = 12
+        end
     else
         df[end, :idtl] = 10
     end
@@ -100,14 +107,14 @@ function taxsim32(df; connection = "FTP", full = false, long_names = false)
             try
                 run(pipeline(`ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no taxsimssh@taxsimssh.nber.org`, stdin=seekstart(CSV.write(IOBuffer(), df)), stdout=io_out))
             catch
-                @error "Cannot connect to the TAXSIM server via SSH"
+                @error "Cannot connect to the TAXSIM server via SSH -> try FTP and check your firewall settings"
             end
         end
         if Sys.iswindows() == true
             try
                 run(pipeline(`ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no taxsimssh@taxsimssh.nber.org`, stdin=seekstart(CSV.write(IOBuffer(), df)), stdout=io_out))
             catch
-                @error "Cannot connect to the TAXSIM server via SSH"
+                @error "Cannot connect to the TAXSIM server via SSH -> try FTP and check your firewall settings"
             end
         end
         df_res = CSV.read(seekstart(io_out), DataFrame; silencewarnings=true)
@@ -116,7 +123,7 @@ function taxsim32(df; connection = "FTP", full = false, long_names = false)
         try
             cd(ftp, "tmp")
         catch
-            @error "Cannot connect to the TAXSIM server via FTP"
+            @error "Cannot connect to the TAXSIM server via FTP -> try SSH and check your firewall settings"
         end
         upload(ftp, CSV.write(IOBuffer(), df), "/userid")
         df_res = CSV.read(seekstart(download(ftp, "/userid.txm32")), DataFrame; silencewarnings=true)
@@ -132,8 +139,6 @@ function taxsim32(df; connection = "FTP", full = false, long_names = false)
             rename!(df_res, [ll_default; ll_full; ll_state])
         end
     end
-
-    select!(df, Not([:taxsimid, :idtl]))
 
     if sum(occursin.("state", names(df))) == 0 || (sum(occursin.("state", names(df))) == 1 && df[1, :state] == 0) select!(df_res, Not(names(df_res)[30:end])) end # Drop empty state if no state or state = 0 in df
 
