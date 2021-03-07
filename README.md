@@ -38,8 +38,8 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 #### Keyword Arguments
 
 - `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"` (which is faster).
-- `full`: request the full list of TAXSIM return variables v1 to v41. Defaults to `false` which returns v1 to v9.
-- `long_names`: name all return variables with their long TAXSIM names. Defaults to `false` which returns abbreviated names for v1 to v9 and no names for v10 to v41.
+- `full`: request the full list of TAXSIM return variables v1 to v45. Defaults to `false` which returns v1 to v9.
+- `long_names`: name all return variables with their long TAXSIM names. Defaults to `false` which returns abbreviated names for v1 to v9 and no names for v10 to v45.
 
 #### Output
 
@@ -66,12 +66,12 @@ df_small_output_default = taxsim32(df_small_input)
 ├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
 │ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.0    │
 
-df_small_output_full = taxsim32(df_small_input, connection = "SSH", full=true)
+df_small_output_full = taxsim32(df_small_input, connection="SSH", full=true)
 1×29 DataFrame
-│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v25     │
-│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │
-├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼
-│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │
+│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v29     │ v42     │ ... | v45     │
+│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │ Float64 | ... | Float64 |
+├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼─────────┼─────┼─────────┼
+│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │ 0.0     | ... | 0.0     |
 
 df_small_output_names = taxsim32(df_small_input, long_names=true)
 1×9 DataFrame
@@ -103,11 +103,11 @@ Expect three different kinds of errors
 
 1. **Input Error** Adjust `df` so it meets the required column types and names.
 2. **Connection Error** Indicates that `taxsim32` cannot connect to the TAXSIM server. Try a different connection option. If this does not help, check your internet and network settings and contact your network administrator - you're probably behind a restrictive firewall.
-3. **Server Error** Forwarded from the TAXSIM server. Either a faulty `df` passed the input tests or TAXSIM cannot compute the tax variables for some other reason (which the error message hopefully helps to identify).
+3. **Server Error** Returned from the TAXSIM server (error message begins with "TAXSIM: ... "). Either a faulty `df` passed the input tests or TAXSIM cannot compute the tax variables for some other reason which the error message hopefully helps to identify. Example: "TAXSIM: Non-joint return with 2 wage-earners"
 
 Please file an issue if you experience problems with large input data frames (server non-response, truncated return data frames, etc).
 
 ### Scheduled Updates
 
-- `taxsim32` currently returns marginal tax rates computed with respect to taxpayer earnings. Marginal rates for "Wage Income", "Spouse Earning", etc. will be included as keyword options in future versions.
-- HTTP connection will be included as another connection option in future versions.
+- `taxsim32` currently returns marginal tax rates computed with respect to taxpayer earnings. Marginal rates for "Wage Income", "Spouse Earning", etc. will be included as keyword options in future releases.
+- HTTP connection will be included as another connection option in future releases.
