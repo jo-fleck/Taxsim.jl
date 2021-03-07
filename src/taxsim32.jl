@@ -13,8 +13,8 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 #### Keyword Arguments
 
 - `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"`.
-- `full`: request the full list of TAXSIM return variables v1 to v41. Defaults to `false` which returns v1 to v9.
-- `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v41). Defaults to `false`.
+- `full`: request the full list of TAXSIM return variables v1 to v45. Defaults to `false` which returns v1 to v9.
+- `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v45). Defaults to `false`.
 
 #### Output
 
@@ -41,12 +41,12 @@ df_small_output_default = taxsim32(df_small_input)
 ├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
 │ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.0    │
 
-df_small_output_full = taxsim32(df_small_input, connection = "SSH", full=true)
+df_small_output_full = taxsim32(df_small_input, connection="SSH", full=true)
 1×29 DataFrame
-│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v25     │
-│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │
-├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼
-│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │
+│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v29     │ v42     │ ... | v45     │
+│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │ Float64 | ... | Float64 |
+├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼─────────┼─────┼─────────┼
+│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │ 0.0     | ... | 0.0     |
 
 df_small_output_names = taxsim32(df_small_input, long_names=true)
 1×9 DataFrame
@@ -94,7 +94,7 @@ function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
         if size(df,1) == 1
             df[end, :idtl] = 12
         else
-            df[1:end-1, :idtl] = 2
+            df[:, :idtl] = 2*ones(Int64,size(df,1))
             df[end, :idtl] = 12
         end
     else
@@ -140,7 +140,7 @@ function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
         end
     end
 
-    if sum(occursin.("state", names(df))) == 0 || (sum(occursin.("state", names(df))) == 1 && df[1, :state] == 0) select!(df_res, Not(names(df_res)[30:end])) end # Drop empty state if no state or state = 0 in df
+    if full == true && (sum(occursin.("state", names(df_in))) == 0 || (sum(occursin.("state", names(df_in))) == 1 && df_in[1, :state] == 0)) select!(df_res, Not(names(df_res)[30:41])) end # Drop v30 to v41 if no state or state == 0 in df_in
 
     return df_res
 end
