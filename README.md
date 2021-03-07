@@ -109,6 +109,5 @@ Please file an issue if you experience problems with large input data frames (se
 
 ### Scheduled Updates
 
-- For `request = full` the TAXSIM server currently returns more variables than listed as TAXSIM 32 outputs. At the moment, `taxsim32` only keeps returned variables until v41 (State Bracket Rate). I will clarify with Dan Feenberg and adjust this behavior.
 - `taxsim32` currently returns marginal tax rates computed with respect to taxpayer earnings. Marginal rates for "Wage Income", "Spouse Earning", etc. will be included as keyword options in future versions.
 - HTTP connection will be included as another connection option in future versions.
