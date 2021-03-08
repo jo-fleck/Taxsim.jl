@@ -12,7 +12,7 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 
 #### Keyword Arguments
 
-- `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"`.
+- `connection`: choose either `"SSH"` or `"FTP"`. `"SSH"` issues a system curl command while `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl). Defaults to `"SSH"` (which is faster).
 - `full`: request the full list of TAXSIM return variables v1 to v45. Defaults to `false` which returns v1 to v9.
 - `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v45). Defaults to `false`.
 
@@ -72,11 +72,14 @@ df_small_stateN_out = taxsim32(df_small_stateN)
  10000 │  10000.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
 ```
 """
-function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
+function taxsim32(df_in::DataFrame; connection = "SSH", full = false, long_names = false)
 
     # Input checks
-    if typeof(df_in) != DataFrame error("Input must be a data frame") end
-    if isempty(df_in) == true error("Input data frame is empty") end
+    #if typeof(df_in) != DataFrame error("Input must be a data frame") end      -> now in separate function
+
+    @assert isempty(df_in) == false error("Input data frame is empty")
+    #if isempty(df_in) == true error("Input data frame is empty") end
+
     TAXSIM32_vars = ["taxsimid","year","state","mstat","page","sage","depx","dep13","dep17","dep18","pwages","swages","dividends","intrec","stcg","ltcg","otherprop","nonprop","pensions","gssi","ui","transfers","rentpaid","rentpaid","otheritem","childcare","mortgage","scorp","pbusinc","pprofinc","sbusinc","sprofinc"];
     for (i, input_var) in enumerate(names(df_in))
         if (input_var in TAXSIM32_vars) == false error("Input contains \"" * input_var *"\" which is not an allowed TAXSIM 32 variable name") end
@@ -143,4 +146,8 @@ function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
     if full == true && (sum(occursin.("state", names(df_in))) == 0 || (sum(occursin.("state", names(df_in))) == 1 && df_in[1, :state] == 0)) select!(df_res, Not(names(df_res)[30:41])) end # Drop v30 to v41 if no state or state == 0 in df_in
 
     return df_res
+end
+
+function taxsim32(df_in::Any; connection = "FTP", full = false, long_names = false)
+    error("Input must be a data frame")
 end

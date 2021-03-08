@@ -37,7 +37,7 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 
 #### Keyword Arguments
 
-- `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"` (which is faster).
+- `connection`: choose either `"SSH"` or `"FTP"`. `"SSH"` issues a system curl command while `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl). Defaults to `"SSH"` (which is faster).
 - `full`: request the full list of TAXSIM return variables v1 to v45. Defaults to `false` which returns v1 to v9.
 - `long_names`: name all return variables with their long TAXSIM names. Defaults to `false` which returns abbreviated names for v1 to v9 and no names for v10 to v45.
 

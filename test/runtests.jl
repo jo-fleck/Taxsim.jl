@@ -24,12 +24,12 @@ end
 df_small = DataFrame(year=1980, mstat=2, ltcg=100000)
 
 @testset "SSH connection" begin
-    df_default_out_ssh = taxsim32(df_small, connection = "SSH")
+    df_default_out_ssh = taxsim32(df_small)
     @test typeof(df_default_out_ssh) == DataFrame
 end
 
 @testset "FTP connection" begin
-    df_default_out_ftp = taxsim32(df_small)
+    df_default_out_ftp = taxsim32(df_small, connection = "FTP")
     @test typeof(df_default_out_ftp) == DataFrame
 end
 
@@ -80,14 +80,14 @@ N = 100
 df_small_stateN = DataFrame(year=repeat([1980],inner=N), mstat=repeat([2],inner=N), ltcg=repeat([100000],inner=N), state=repeat([1],inner=N))
 
 @testset "N filer output: SSH connection" begin
-    df_small_stateN_full_out_ssh = taxsim32(df_small_stateN, connection = "SSH", full = true)
+    df_small_stateN_full_out_ssh = taxsim32(df_small_stateN, full = true)
     @test df_small_stateN_full_out_ssh.fiitax[N] == 10920.0
     @test df_small_stateN_full_out_ssh.siitax[N] == 1119.0
     @test size(df_small_stateN_full_out_ssh,2) == 45
 end
 
 @testset "N filer output: FTP connection" begin
-    df_small_stateN_full_out_ftp = taxsim32(df_small_stateN, full = true)
+    df_small_stateN_full_out_ftp = taxsim32(df_small_stateN, connection = "FTP", full = true)
     @test df_small_stateN_full_out_ftp.fiitax[N] == 10920.0
     @test df_small_stateN_full_out_ftp.siitax[N] == 1119.0
     @test size(df_small_stateN_full_out_ftp,2) == 45
@@ -111,3 +111,22 @@ end
     @test names(df_small_state_full_out_long_names)[45] == "CARES act Recovery Rebates"
 
 end
+
+
+# Performance Tests:
+
+# 1 filer
+
+@timev taxsim32(df_small)
+@timev taxsim32(df_small, connection = "FTP")
+
+# N filer
+
+N_perf = 100000
+df_small_stateN_perf = DataFrame(year=repeat([1980],inner=N_perf), mstat=repeat([2],inner=N_perf), ltcg=repeat([100000],inner=N_perf), state=repeat([1],inner=N_perf))
+
+@timev taxsim32(df_small_stateN_perf, full = true)
+@timev taxsim32(df_small_stateN_perf, connection = "FTP", full = true)
+
+@profiler taxsim32(df_small_stateN_perf, full = true)
+@profiler taxsim32(df_small_stateN_perf, connection = "FTP", full = true)
