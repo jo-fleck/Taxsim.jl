@@ -12,9 +12,9 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 
 #### Keyword Arguments
 
-- `connection`: choose either `"FTP"` or `"SSH"`. `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl) while `"SSH"` issues a system curl command. Defaults to `"FTP"`.
-- `full`: request the full list of TAXSIM return variables v1 to v41. Defaults to `false` which returns v1 to v9.
-- `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v41). Defaults to `false`.
+- `connection`: choose either `"SSH"` or `"FTP"`. `"SSH"` issues a system curl command while `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl). Defaults to `"SSH"` (which is faster).
+- `full`: request the full list of TAXSIM return variables v1 to v45. Defaults to `false` which returns v1 to v9.
+- `long_names`: name all return variables with their long TAXSIM names (as opposed to abbreviated names for v1 to v9 and no names for v10 to v45). Defaults to `false`.
 
 #### Output
 
@@ -41,12 +41,12 @@ df_small_output_default = taxsim32(df_small_input)
 ├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
 │ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.0    │
 
-df_small_output_full = taxsim32(df_small_input, connection = "SSH", full=true)
+df_small_output_full = taxsim32(df_small_input, connection="FTP", full=true)
 1×29 DataFrame
-│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v25     │
-│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │
-├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼
-│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │
+│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v29     │ v42     │ ... | v45     │
+│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │ Float64 | ... | Float64 |
+├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼─────────┼─────┼─────────┼
+│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │ 0.0     | ... | 0.0     |
 
 df_small_output_names = taxsim32(df_small_input, long_names=true)
 1×9 DataFrame
@@ -72,16 +72,20 @@ df_small_stateN_out = taxsim32(df_small_stateN)
  10000 │  10000.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
 ```
 """
-function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
+function taxsim32(df_in; connection = "SSH", full = false, long_names = false, checks = true)
 
     # Input checks
-    if typeof(df_in) != DataFrame error("Input must be a data frame") end
-    if isempty(df_in) == true error("Input data frame is empty") end
-    TAXSIM32_vars = ["taxsimid","year","state","mstat","page","sage","depx","dep13","dep17","dep18","pwages","swages","dividends","intrec","stcg","ltcg","otherprop","nonprop","pensions","gssi","ui","transfers","rentpaid","rentpaid","otheritem","childcare","mortgage","scorp","pbusinc","pprofinc","sbusinc","sprofinc"];
-    for (i, input_var) in enumerate(names(df_in))
-        if (input_var in TAXSIM32_vars) == false error("Input contains \"" * input_var *"\" which is not an allowed TAXSIM 32 variable name") end
-        if any(ismissing.(df_in[!, i])) == true error("Input contains \"" * input_var *"\" with missing(s) which TAXSIM does not accept") end
-        if (eltype(df_in[!, i]) == Int || eltype(df_in[!, i]) == Float64 || eltype(df_in[!, i]) == Float32 || eltype(df_in[!, i]) == Float16) == false error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
+    if checks == true
+        if typeof(df_in) != DataFrame error("Input must be a data frame") end
+        if isempty(df_in) == true error("Input data frame is empty") end
+
+        TAXSIM32_vars = ["taxsimid","year","state","mstat","page","sage","depx","dep13","dep17","dep18","pwages","swages","dividends","intrec","stcg","ltcg","otherprop","nonprop","pensions","gssi","ui","transfers","rentpaid","rentpaid","otheritem","childcare","mortgage","scorp","pbusinc","pprofinc","sbusinc","sprofinc"];
+        for (i, input_var) in enumerate(names(df_in))
+            if (input_var in TAXSIM32_vars) == false error("Input contains \"" * input_var *"\" which is not an allowed TAXSIM 32 variable name") end
+            if any(ismissing.(df_in[!, i])) == true error("Input contains \"" * input_var *"\" with missing(s) which TAXSIM does not accept") end
+            if (eltype(df_in[!, i]) == Int || eltype(df_in[!, i]) == Float64 || eltype(df_in[!, i]) == Float32 || eltype(df_in[!, i]) == Float16) == false error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
+        end
+        else
     end
 
     df = deepcopy(df_in)
@@ -94,7 +98,7 @@ function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
         if size(df,1) == 1
             df[end, :idtl] = 12
         else
-            df[1:end-1, :idtl] = 2
+            df[:, :idtl] = 2*ones(Int64,size(df,1))
             df[end, :idtl] = 12
         end
     else
@@ -132,7 +136,7 @@ function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
     if long_names == true
         ll_default = ["Case ID","Year","State","Federal income tax liability including capital gains rates, surtaxes, AMT and refundable and non-refundable credits","State income tax liability","FICA (OADSI and HI, sum of employee AND employer)","federal marginal rate","state marginal rate","FICA rate"];
         ll_full = ["Federal AGI","UI in AGI","Social Security in AGI","Zero Bracket Amount","Personal Exemptions","Exemption Phaseout","Deduction Phaseout","Deductions Allowed (Zero for non-itemizers)","Federal Taxable Income","Tax on Taxable Income (no special capital gains rates)","Exemption Surtax","General Tax Credit","Child Tax Credit (as adjusted)","Additional Child Tax Credit (refundable)","Child Care Credit","Earned Income Credit (total federal)","Income for the Alternative Minimum Tax","AMT Liability after credit for regular tax and other allowed credits","Federal Income Tax Before Credits (includes special treatment of Capital gains, exemption surtax (1988-1996) and 15% rate phaseout (1988-1990) but not AMT)","FICA"];
-        ll_state = ["State Household Income (imputation for property tax credit)","State Rent Expense (imputation for property tax credit)","State AGI","State Exemption amount","State Standard Deduction","State Itemized Deductions","State Taxable Income","State Property Tax Credit","State Child Care Credit","State EIC","State Total Credits","State Bracket Rate"];
+        ll_state = ["State Household Income (imputation for property tax credit)","State Rent Expense (imputation for property tax credit)","State AGI","State Exemption amount","State Standard Deduction","State Itemized Deductions","State Taxable Income","State Property Tax Credit","State Child Care Credit","State EIC","State Total Credits","State Bracket Rate","Earned Self-Employment Income for FICA","Medicare Tax on Unearned Income","Medicare Tax on Earned Income","CARES act Recovery Rebates"];
         if full == false
             rename!(df_res, ll_default)
         else
@@ -140,7 +144,7 @@ function taxsim32(df_in; connection = "FTP", full = false, long_names = false)
         end
     end
 
-    if sum(occursin.("state", names(df))) == 0 || (sum(occursin.("state", names(df))) == 1 && df[1, :state] == 0) select!(df_res, Not(names(df_res)[30:end])) end # Drop empty state if no state or state = 0 in df
+    if full == true && (sum(occursin.("state", names(df_in))) == 0 || (sum(occursin.("state", names(df_in))) == 1 && df_in[1, :state] == 0)) select!(df_res, Not(names(df_res)[30:41])) end # Drop v30 to v41 if no state or state == 0 in df_in
 
     return df_res
 end
