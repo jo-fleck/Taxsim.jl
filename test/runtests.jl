@@ -113,20 +113,26 @@ end
 end
 
 
-# Performance Tests:
-
-# 1 filer
-
-@timev taxsim32(df_small)
-@timev taxsim32(df_small, connection = "FTP")
-
-# N filer
-
-N_perf = 100000
-df_small_stateN_perf = DataFrame(year=repeat([1980],inner=N_perf), mstat=repeat([2],inner=N_perf), ltcg=repeat([100000],inner=N_perf), state=repeat([1],inner=N_perf))
-
-@timev taxsim32(df_small_stateN_perf, full = true)
-@timev taxsim32(df_small_stateN_perf, connection = "FTP", full = true)
-
-@profiler taxsim32(df_small_stateN_perf, full = true)
-@profiler taxsim32(df_small_stateN_perf, connection = "FTP", full = true)
+# # Performance Tests:
+#
+# # 1 filer
+#
+# @timev taxsim32(df_small);
+# @timev taxsim32(df_small, connection = "FTP");
+#
+# # N filer
+#
+# N_perf = 100000;
+# df_small_stateN_perf = DataFrame(year=repeat([1980],inner=N_perf), mstat=repeat([2],inner=N_perf), ltcg=repeat([100000],inner=N_perf), state=repeat([1],inner=N_perf));
+#
+# @timev taxsim32(df_small_stateN_perf, full = true);
+# @timev taxsim32(df_small_stateN_perf, connection = "FTP", full = true);
+# @timev taxsim32(df_small_stateN_perf, full = true, checks = false);
+#
+# @code_native taxsim32(df_small_stateN_perf, full = true);
+# @code_native taxsim32(df_small_stateN_perf, connection = "FTP", full = true);
+# @code_native taxsim32(df_small_stateN_perf, full = true, checks = false);
+#
+# @profiler taxsim32(df_small_stateN_perf, full = true);
+# @profiler taxsim32(df_small_stateN_perf, connection = "FTP", full = true);
+# @profiler taxsim32(df_small_stateN_perf, full = true, checks = false);

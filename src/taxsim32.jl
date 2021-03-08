@@ -41,7 +41,7 @@ df_small_output_default = taxsim32(df_small_input)
 ├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
 │ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.0    │
 
-df_small_output_full = taxsim32(df_small_input, connection="SSH", full=true)
+df_small_output_full = taxsim32(df_small_input, connection="FTP", full=true)
 1×29 DataFrame
 │ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v29     │ v42     │ ... | v45     │
 │     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │ Float64 | ... | Float64 |
@@ -72,19 +72,20 @@ df_small_stateN_out = taxsim32(df_small_stateN)
  10000 │  10000.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
 ```
 """
-function taxsim32(df_in::DataFrame; connection = "SSH", full = false, long_names = false)
+function taxsim32(df_in; connection = "SSH", full = false, long_names = false, checks = true)
 
     # Input checks
-    #if typeof(df_in) != DataFrame error("Input must be a data frame") end      -> now in separate function
+    if checks == true
+        if typeof(df_in) != DataFrame error("Input must be a data frame") end
+        if isempty(df_in) == true error("Input data frame is empty") end
 
-    @assert isempty(df_in) == false error("Input data frame is empty")
-    #if isempty(df_in) == true error("Input data frame is empty") end
-
-    TAXSIM32_vars = ["taxsimid","year","state","mstat","page","sage","depx","dep13","dep17","dep18","pwages","swages","dividends","intrec","stcg","ltcg","otherprop","nonprop","pensions","gssi","ui","transfers","rentpaid","rentpaid","otheritem","childcare","mortgage","scorp","pbusinc","pprofinc","sbusinc","sprofinc"];
-    for (i, input_var) in enumerate(names(df_in))
-        if (input_var in TAXSIM32_vars) == false error("Input contains \"" * input_var *"\" which is not an allowed TAXSIM 32 variable name") end
-        if any(ismissing.(df_in[!, i])) == true error("Input contains \"" * input_var *"\" with missing(s) which TAXSIM does not accept") end
-        if (eltype(df_in[!, i]) == Int || eltype(df_in[!, i]) == Float64 || eltype(df_in[!, i]) == Float32 || eltype(df_in[!, i]) == Float16) == false error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
+        TAXSIM32_vars = ["taxsimid","year","state","mstat","page","sage","depx","dep13","dep17","dep18","pwages","swages","dividends","intrec","stcg","ltcg","otherprop","nonprop","pensions","gssi","ui","transfers","rentpaid","rentpaid","otheritem","childcare","mortgage","scorp","pbusinc","pprofinc","sbusinc","sprofinc"];
+        for (i, input_var) in enumerate(names(df_in))
+            if (input_var in TAXSIM32_vars) == false error("Input contains \"" * input_var *"\" which is not an allowed TAXSIM 32 variable name") end
+            if any(ismissing.(df_in[!, i])) == true error("Input contains \"" * input_var *"\" with missing(s) which TAXSIM does not accept") end
+            if (eltype(df_in[!, i]) == Int || eltype(df_in[!, i]) == Float64 || eltype(df_in[!, i]) == Float32 || eltype(df_in[!, i]) == Float16) == false error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
+        end
+        else
     end
 
     df = deepcopy(df_in)
@@ -146,8 +147,4 @@ function taxsim32(df_in::DataFrame; connection = "SSH", full = false, long_names
     if full == true && (sum(occursin.("state", names(df_in))) == 0 || (sum(occursin.("state", names(df_in))) == 1 && df_in[1, :state] == 0)) select!(df_res, Not(names(df_res)[30:41])) end # Drop v30 to v41 if no state or state == 0 in df_in
 
     return df_res
-end
-
-function taxsim32(df_in::Any; connection = "FTP", full = false, long_names = false)
-    error("Input must be a data frame")
 end

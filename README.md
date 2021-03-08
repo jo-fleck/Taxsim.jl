@@ -66,7 +66,7 @@ df_small_output_default = taxsim32(df_small_input)
 ├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
 │ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.0    │
 
-df_small_output_full = taxsim32(df_small_input, connection="SSH", full=true)
+df_small_output_full = taxsim32(df_small_input, connection="FTP", full=true)
 1×29 DataFrame
 │ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v29     │ v42     │ ... | v45     │
 │     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │ Float64 | ... | Float64 |
