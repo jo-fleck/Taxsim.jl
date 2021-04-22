@@ -9,10 +9,10 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 FTPClient = "01fcc997-4f28-56b8-8a06-30002c134abb"
 
 [compat]
-julia = "1"
 CSV = "0.8"
+DataFrames = "0.22, 1.0"
 FTPClient = "1.2"
-DataFrames = "0.22"
+julia = "1"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
