@@ -12,6 +12,10 @@
 
 `Taxsim.jl` exchanges data between the Julia workspace and the server. Its function `taxsim32` supports the latest [TAXSIM version 32](https://taxsim.nber.org/taxsim32/). Future versions will be included.
 
+#### Video Tutorial
+
+Here is a [short video tutorial](https://www.youtube.com/watch?v=dc3iunpMA1o) I gave at JuliaCon21. It illustrates how to use `Taxsim.jl` with Census and American Community Survey data (downloaded from [IPUMS](https://www.ipums.org)).
+
 #### Acknowledgments
 
 Daniel Feenberg develops and maintains TAXSIM. He and his collaborators provide [helpful materials](http://users.nber.org/~taxsim/) including codes to prepare input files from household datasets (CPS, SCF, PSID).
