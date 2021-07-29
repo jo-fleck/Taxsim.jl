@@ -14,7 +14,7 @@
 
 #### Video Tutorial
 
-Here is a [short video tutorial](https://www.youtube.com/watch?v=dc3iunpMA1o) I gave at JuliaCon21. It illustrates how to use `Taxsim.jl` with Census and American Community Survey data (downloaded from [IPUMS](https://www.ipums.org)).
+Here is a [short video tutorial](https://www.youtube.com/watch?v=dc3iunpMA1o) I gave at JuliaCon2021. It illustrates how to use `Taxsim.jl` with Census and American Community Survey data (downloaded from [IPUMS](https://www.ipums.org)).
 
 #### Acknowledgments
 
