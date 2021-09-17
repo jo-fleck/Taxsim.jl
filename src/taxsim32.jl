@@ -121,7 +121,7 @@ function taxsim32(df_in; connection = "SSH", full = false, long_names = false, c
                 @error "Cannot connect to the TAXSIM server via SSH -> try FTP and check your firewall settings"
             end
         end
-        df_res = CSV.read(seekstart(io_out), DataFrame; silencewarnings=true)
+        df_res = CSV.read(seekstart(io_out), DataFrame; delim=',', silencewarnings=true)
     else
         ftp = FTP(hostname="taxsimftp.nber.org", username="taxsim", password="02138")
         try
@@ -130,7 +130,7 @@ function taxsim32(df_in; connection = "SSH", full = false, long_names = false, c
             @error "Cannot connect to the TAXSIM server via FTP -> try SSH and check your firewall settings"
         end
         upload(ftp, CSV.write(IOBuffer(), df), "/userid")
-        df_res = CSV.read(seekstart(download(ftp, "/userid.txm32")), DataFrame; silencewarnings=true)
+        df_res = CSV.read(seekstart(download(ftp, "/userid.txm32")), DataFrame; delim=',', silencewarnings=true)
     end
 
     if long_names == true
