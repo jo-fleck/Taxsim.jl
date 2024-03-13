@@ -1,7 +1,7 @@
 name = "Taxsim"
 uuid = "59040a2c-5e82-4c13-ac8f-a77670789620"
 authors = ["Johannes Fleck <jofleck.work@gmail.com>"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
@@ -9,7 +9,7 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 FTPClient = "01fcc997-4f28-56b8-8a06-30002c134abb"
 
 [compat]
-CSV = "0.8, 0.9"
+CSV = "0.8, 0.9, 0.10"
 DataFrames = "0.22, 1.0"
 FTPClient = "1.2"
 julia = "1"
