@@ -1,15 +1,15 @@
 
 
 """
-Before using `taxsim35`, please make yourself familiar with [Internet TAXSIM 32](https://taxsim.nber.org/taxsim32/). Submit a few individual observations and upload an entire csv file.
+Before using `taxsim35`, please make yourself familiar with [Internet TAXSIM 35](https://taxsim.nber.org/taxsim35/). Submit a few individual observations and upload an entire csv file.
 
 #### Syntax
 
-`taxsim32(df; kwargs...)`
+`taxsim35(df; kwargs...)`
 
 - `df` has to be a DataFrame object with at least one observation.
-    - Included columns have to be named exactly as in the Internet TAXSIM 32 variable list (bold names after boxes) but can be in any order. `taxsim32` returns typos and case errors.
-    - Non-provided input variables are set to zero by the TAXSIM server but `" "` (blanks as strings) or `missing` lead to non-response as the server only accepts Integers or Floats. `taxsim32` returns type errors.
+    - Included columns have to be named exactly as in the Internet TAXSIM 35 variable list (bold names after boxes) but can be in any order. `taxsim35` returns typos and case errors.
+    - Non-provided input variables are set to zero by the TAXSIM server but `" "` (blanks as strings) or `missing` lead to non-response as the server only accepts Integers or Floats. `taxsim35` returns type errors.
 
 #### Keyword Arguments
 
@@ -30,47 +30,50 @@ using DataFrames, Taxsim
 
 df_small_input = DataFrame(year=1980, mstat=2, ltcg=100000)
 1×3 DataFrame
-│ Row │ year  │ mstat │ ltcg   │
-│     │ Int64 │ Int64 │ Int64  │
-├─────┼───────┼───────┼────────┤
-│ 1   │ 1980  │ 2     │ 100000 │
+ Row │ year   mstat  ltcg   
+     │ Int64  Int64  Int64  
+─────┼──────────────────────
+   1 │  1980      2  100000
 
-df_small_output_default = taxsim32(df_small_input)
-1×9 DataFrame
-│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │
-│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │
-├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
-│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.0    │
+df_small_output_default = taxsim35(df_small_input)
+1×10 DataFrame
+ Row │ taxsimid  year   state  fiitax   siitax   fica     frate    srate    ficar    tfica   
+     │ Float64   Int64  Int64  Float64  Float64  Float64  Float64  Float64  Float64  Float64 
+─────┼───────────────────────────────────────────────────────────────────────────────────────
+   1 │      1.0   1980      0  10920.0      0.0      0.0     20.0      0.0    11.21      0.0
 
-df_small_output_full = taxsim32(df_small_input, connection="FTP", full=true)
+df_small_output_full = taxsim35(df_small_input, connection="FTP", full=true)
 1×29 DataFrame
 │ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v29     │ v42     │ ... | v45     │
 │     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │ Float64 | ... | Float64 |
 ├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼─────────┼─────┼─────────┼
 │ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │ 0.0     | ... | 0.0     |
 
-df_small_output_names = taxsim32(df_small_input, long_names=true)
-1×9 DataFrame
-│ Row │ Case ID │ Year  │ State │ Federal income tax liability including capital gains rates, surtaxes, AMT and refundable and non-refundable credits │ ... │ federal marginal rate │
-│     │ Float64 │ Int64 │ Int64 │ Float64                                                                                                             │ ... │ Float64               │
-├─────┼─────────┼───────┼───────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┼─
-│ 1   │ 0.0     │ 1980  │ 0     │ 10920.0                                                                                                             │ ...  │ 20.0                 │
+df_small_output_names = taxsim35(df_small_input, long_names=true)
+1×10 DataFrame
+ Row │ Case ID  Year   State  Federal income tax liability including capital gains rates, surtaxes, Maximum Tax, NIIT, AMT and refundable and non-refundable credits  State income tax liability  FICA (OADSI and HI, sum of employee AND employer)  federal marginal rate  state margina ⋯
+     │ Float64  Int64  Int64  Float64                                                                                                                                 Float64                     Float64                                            Float64                Float64       ⋯
+─────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │     1.0   1980      0                                                                                                                                 10920.0                         0.0                                                0.0                   20.0                ⋯
+
 
 N = 10000
 df_small_stateN = DataFrame(year=repeat([1980],inner=N), mstat=repeat([2],inner=N), ltcg=repeat([100000],inner=N), state=repeat([1],inner=N))
-df_small_stateN_out = taxsim32(df_small_stateN)
-10000×9 DataFrame
-   Row │ taxsimid  year   state  fiitax   siitax   fica     frate    srate    ficar
-       │ Float64   Int64  Int64  Float64  Float64  Float64  Float64  Float64  Float64
-───────┼──────────────────────────────────────────────────────────────────────────────
-     1 │      1.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
-     2 │      2.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
-     3 │      3.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
-     4 │      4.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
-   ⋮   │    ⋮        ⋮      ⋮       ⋮        ⋮        ⋮        ⋮        ⋮        ⋮
-  9998 │   9998.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
-  9999 │   9999.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
- 10000 │  10000.0   1980      1  10920.0   1119.0      0.0     20.0      4.0     12.0
+df_small_stateN_out = taxsim35(df_small_stateN)
+10000×10 DataFrame
+   Row │ taxsimid  year   state  fiitax   siitax   fica     frate    srate    ficar    tfica   
+       │ Float64   Int64  Int64  Float64  Float64  Float64  Float64  Float64  Float64  Float64 
+───────┼───────────────────────────────────────────────────────────────────────────────────────
+     1 │      1.0   1980      1  10920.0   1119.0      0.0     20.0      4.0    11.21      0.0
+     2 │      2.0   1980      1  10920.0   1119.0      0.0     20.0      4.0    11.21      0.0
+     3 │      3.0   1980      1  10920.0   1119.0      0.0     20.0      4.0    11.21      0.0
+     4 │      4.0   1980      1  10920.0   1119.0      0.0     20.0      4.0    11.21      0.0
+   ⋮   │    ⋮        ⋮      ⋮       ⋮        ⋮        ⋮        ⋮        ⋮        ⋮        ⋮
+  9997 │   9997.0   1980      1  10920.0   1119.0      0.0     20.0      4.0    11.21      0.0
+  9998 │   9998.0   1980      1  10920.0   1119.0      0.0     20.0      4.0    11.21      0.0
+  9999 │   9999.0   1980      1  10920.0   1119.0      0.0     20.0      4.0    11.21      0.0
+ 10000 │  10000.0   1980      1  10920.0   1119.0      0.0     20.0      4.0    11.21      0.0
+                                                                              9992 rows omitted
 ```
 """
 function taxsim35(df_in; connection = "SSH", full = false, long_names = false, checks = true)
@@ -80,11 +83,11 @@ function taxsim35(df_in; connection = "SSH", full = false, long_names = false, c
         if typeof(df_in) != DataFrame error("Input must be a data frame") end
         if isempty(df_in) == true error("Input data frame is empty") end
 
-        TAXSIM32_vars = ["taxsimid","year","state","mstat","page","sage","depx","dep13","dep17","dep18","pwages","swages","psemp","ssemp","dividends","intrec","stcg","ltcg","otherprop","nonprop","pensions","gssi","pui","sui","transfers","rentpaid","rentpaid","otheritem","childcare","mortgage","scorp","pbusinc","pprofinc","sbusinc","sprofinc"];
+        TAXSIM35_vars = ["taxsimid","year","state","mstat","page","sage","depx","dep13","dep17","dep18","pwages","swages","psemp","ssemp","dividends","intrec","stcg","ltcg","otherprop","nonprop","pensions","gssi","pui","sui","transfers","rentpaid","rentpaid","otheritem","childcare","mortgage","scorp","pbusinc","pprofinc","sbusinc","sprofinc"];
         for (i, input_var) in enumerate(names(df_in))
             if !(input_var in TAXSIM35_vars) error("Input contains \"" * input_var *"\" which is not an allowed TAXSIM 35 variable name") end
             if any(ismissing.(df_in[!, i])) error("Input contains \"" * input_var *"\" with missing(s) which TAXSIM does not accept") end
-            if !(eltype(df_in[!, i]) <: Union{Int, AbstractFloat) error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
+            if !(eltype(df_in[!, i]) <: Union{Int, AbstractFloat}) error("Input contains \"" * input_var *"\" which is a neiter an Integer nor a Float variable as required by TAXSIM") end
         end
         else
     end
@@ -135,8 +138,8 @@ function taxsim35(df_in; connection = "SSH", full = false, long_names = false, c
     end
 
     if long_names == true
-        ll_default = ["Case ID","Year","State","Federal income tax liability including capital gains rates, surtaxes, AMT and refundable and non-refundable credits","State income tax liability","FICA (OADSI and HI, sum of employee AND employer)","federal marginal rate","state marginal rate","FICA rate"];
-        ll_full = ["Federal AGI","UI in AGI","Social Security in AGI","Zero Bracket Amount","Personal Exemptions","Exemption Phaseout","Deduction Phaseout","Deductions Allowed (Zero for non-itemizers)","Federal Taxable Income","Tax on Taxable Income (no special capital gains rates)","Exemption Surtax","General Tax Credit","Child Tax Credit (as adjusted)","Additional Child Tax Credit (refundable)","Child Care Credit","Earned Income Credit (total federal)","Income for the Alternative Minimum Tax","AMT Liability after credit for regular tax and other allowed credits","Federal Income Tax Before Credits (includes special treatment of Capital gains, exemption surtax (1988-1996) and 15% rate phaseout (1988-1990) but not AMT)","FICA"];
+        ll_default = ["Case ID","Year","State","Federal income tax liability including capital gains rates, surtaxes, Maximum Tax, NIIT, AMT and refundable and non-refundable credits","State income tax liability","FICA (OADSI and HI, sum of employee AND employer)","federal marginal rate","state marginal rate","FICA rate", "Taxpayer liability for FICA"];
+        ll_full = ["Federal AGI","UI in AGI","Social Security in AGI","Zero Bracket Amount","Personal Exemptions","Exemption Phaseout","Deduction Phaseout","Itemized Deductions in taxable income","Federal Taxable Income","Tax on Taxable Income (no special capital gains rates)","Exemption Surtax","General Tax Credit","Child Tax Credit (as adjusted)","Additional Child Tax Credit (refundable)","Child Care Credit","Earned Income Credit (total federal)","Income for the Alternative Minimum Tax","AMT Liability after credit for regular tax and other allowed credits","Federal Income Tax Before Credits (includes special treatment of Capital gains, exemption surtax (1988-1996) and 15% rate phaseout (1988-1990) but not AMT)","FICA"];
         ll_state = ["State Household Income (imputation for property tax credit)","State Rent Expense (imputation for property tax credit)","State AGI","State Exemption amount","State Standard Deduction","State Itemized Deductions","State Taxable Income","State Property Tax Credit","State Child Care Credit","State EIC","State Total Credits","State Bracket Rate","Earned Self-Employment Income for FICA","Medicare Tax on Unearned Income","Medicare Tax on Earned Income","CARES act Recovery Rebates"];
         if full == false
             rename!(df_res, ll_default)
