@@ -44,10 +44,12 @@ df_small_output_default = taxsim35(df_small_input)
 
 df_small_output_full = taxsim35(df_small_input, connection="FTP", full=true)
 1×29 DataFrame
-│ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v29     │ v42     │ ... | v45     │
-│     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │ Float64 | ... | Float64 |
-├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────┼─────────┼─────────┼─────┼─────────┼
-│ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.26   │ 40000.0 │ 0.0     │ ... | 0.0     │ 0.0     | ... | 0.0     |
+1×36 DataFrame
+ Row │ taxsimid  year   state  fiitax   siitax   fica     frate    srate    ficar    tfica    credits  v10      v11      v12      v13      v14      v15      ⋯  v45      
+     │ Float64   Int64  Int64  Float64  Float64  Float64  Float64  Float64  Float64  Float64  Float64  Float64  Float64  Float64  Float64  Float64  Float64  ⋯  Float64  
+─────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │      1.0   1980      0  10920.0      0.0      0.0     20.0      0.0    11.21      0.0      0.0  40000.0      0.0      0.0   3400.0   2000.0      0.0  ⋯      0.0  
+                                                                                                                                            18 columns omitted
 
 df_small_output_names = taxsim35(df_small_input, long_names=true)
 1×10 DataFrame
