@@ -25,9 +25,10 @@ df_small = DataFrame(year=1980, mstat=2, ltcg=100000)
 
 @testset "SSH connection" begin
     df_default_out_ssh = taxsim32(df_small)
-    @test typeof(df_default_out_ssh) == DataFrame
+    @test isempty(df_default_out_ssh) == false
 end
 
+# FTPClient leads to libcurl error 78 in CI testing for Julia > 1.5: https://github.com/invenia/FTPClient.jl/issues/113
 @testset "FTP connection" begin
     df_default_out_ftp = taxsim32(df_small, connection = "FTP")
     @test typeof(df_default_out_ftp) == DataFrame

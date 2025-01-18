@@ -129,8 +129,15 @@ function taxsim32(df_in; connection = "SSH", full = false, long_names = false, c
         catch
             @error "Cannot connect to the TAXSIM server via FTP -> try SSH and check your firewall settings"
         end
-        upload(ftp, CSV.write(IOBuffer(), df), "/userid")
-        df_res = CSV.read(seekstart(download(ftp, "/userid.txm32")), DataFrame; delim=',', silencewarnings=true)
+        upload(ftp, CSV.write(IOBuffer(), df), "/txpydata")
+        df_res = CSV.read(seekstart(download(ftp, "/txpydata.txm35")), DataFrame; delim=',', silencewarnings=true)
+        #upload(ftp, CSV.write(IOBuffer(), df), "/userid")
+        #df_res = CSV.read(seekstart(download(ftp, "/userid.txm35")), DataFrame; delim=',', silencewarnings=true)
+    end
+
+    # Drop last (redundant) column (is returned with missings)
+    if sum(occursin.("Column46", names(df_res))) == 1
+        select!(df_res, Not("Column46"))
     end
 
     if long_names == true
