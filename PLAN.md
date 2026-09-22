@@ -339,7 +339,8 @@ it" indistinguishable from "it was already broken". So: **fix, get green, then r
 Order: Phase 0 → Phase A (fixes on the existing file) → green → Phase 1 (refactor) →
 Phase 2 → Phase 3 → Phase 4 → CI matrix → Phase 5 → Phase 6.
 
-### Phase 0 — Unbreak the environment
+### Phase 0 — Unbreak the environment — **DONE** (`17e3558`)
+
 
 | item | action |
 |---|---|
@@ -353,7 +354,34 @@ lower floor is incompatible with current DataFrames. (1.10.12 is the LTS; 1.13.0
 Before widening CSV to 1.x, re-verify `CSV.write(IOBuffer(), df)` returns a seekable buffer
 and that `CSV.read(io; delim, stripwhitespace, silencewarnings)` keeps its signature.
 
-### Phase A — Bug fixes on the existing file, to a green baseline
+### Phase A — Bug fixes on the existing file, to a green baseline — **DONE** (`4ccae94`, `3570f9b`)
+
+46 offline tests pass in ~3 s; 62 with `TAXSIM_LIVE_TESTS=true`. Verified from a clean
+clone with no local `Manifest.toml`.
+
+Three deviations from the plan as written, all deliberate:
+
+1. **`Tables` is not yet a dependency.** Phase 0 listed it, but nothing uses it until
+   Phase 3, and an unused dependency is exactly what Aqua flags. It lands with its use.
+2. **Response normalization replaced the CSV-kwarg approach.** `CSV.read(...;
+   stripwhitespace=true, silencewarnings=true)` is not portable across the declared compat
+   range: CSV 1.0 **removed `silencewarnings`**, and CSV 1.x **ignores** a trailing extra
+   field with a warning where 0.10 **invents an all-missing column**. Depending on either
+   behaviour would make the package's output a function of which CSV version resolved. The
+   raw response is therefore normalized before parsing, which is version-independent and
+   fully testable offline.
+3. **Fixtures landed here rather than in Phase 4**, because a green *offline* run needs
+   them. Phase 4's remaining work is the 2022/2023 divergence pair, the sidecar metadata
+   files, the scheduled canary workflow and `record_fixtures.jl`.
+
+One defect found during implementation that was not in §2: TAXSIM **exits non-zero when it
+rejects input**, so treating a non-zero exit as a transport failure reported `year=2025` as
+"cannot reach the TAXSIM server" and retried the rejected payload against three more
+endpoints. The transport now inspects stdout before classifying the failure.
+
+Superseded by D6: plan item 6 ("state-drop condition: test all rows, not row 1") became a
+deletion of the drop entirely.
+
 
 No new architecture. Just make it correct and green offline:
 
