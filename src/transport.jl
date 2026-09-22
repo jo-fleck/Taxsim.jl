@@ -137,7 +137,6 @@ function _submit_http(v::TaxsimVersion, table; timeout = DEFAULT_TIMEOUT)
         out, err, ok = _run_stream(cmd, nothing, timeout + 5)
 
         if _looks_like_html(out)
-            first_line = first(something(findfirst(!isempty, strip.(split(out, '\n'))), 1), 1)
             throw(TaxsimTransportError(
                 "$(v.http_url) returned an HTML page rather than TAXSIM output — the endpoint " *
                 "may have moved, or a proxy intercepted the request. Response began: " *
