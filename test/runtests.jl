@@ -7,157 +7,250 @@ const T = Taxsim
 const FIX = joinpath(@__DIR__, "fixtures")
 fixture(name) = read(joinpath(FIX, name), String)
 
-# Network tests are opt-in: they need NBER to be reachable over SSH, which no CI runner can be
-# relied on for. Everything else runs offline against recorded responses.
+# A stand-in transport, so the whole pipeline can be exercised offline against recorded bytes.
+replay(name) = (v, payload; kwargs...) -> fixture(name)
+
+# Network tests are opt-in: they need NBER reachable over SSH, which no CI runner can be relied
+# on for. Everything else runs offline.
 const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
 
 @testset "Taxsim.jl" begin
 
+    @testset "version data" begin
+        @test length(T.TAXSIM32_VARS) == 36
+        @test length(T.TAXSIM35_VARS) == 45
+        @test T.TAXSIM32_VARS ⊆ T.TAXSIM35_VARS          # v35 input is a strict superset
+        @test length(unique(T.TAXSIM32_VARS)) == length(T.TAXSIM32_VARS)
+        # names NBER's taxsim32.ado accepts that the old whitelist was missing
+        @test all(v -> v in T.TAXSIM32_VARS, ("proptax", "sui", "pui", "dep6", "dep19"))
+        @test !any(v -> v in T.TAXSIM32_VARS, T.TAXSIM35_ONLY_VARS)
+    end
+
     @testset "input validation" begin
-        @test_throws ErrorException("Input must be a data frame") taxsim32(Array{Int64,2}(undef, 2, 3))
-        @test_throws ErrorException("Input data frame is empty") taxsim32(DataFrame(year=[], mstat=[], ltcg=[]))
-        @test_throws ErrorException("Input contains \"yyear\" which is not an allowed TAXSIM 32 variable name") taxsim32(DataFrame(yyear=1980, mstat=2, ltcg=100000))
-        @test_throws ErrorException("Input contains \"mstat\" which is a neiter an Integer nor a Float variable as required by TAXSIM") taxsim32(DataFrame(year=1980, mstat="married", ltcg=100000))
+        bad(f) = try f(); nothing catch e; e end
 
-        # missings are still rejected, but the offending rows are now named
-        err = try taxsim32(DataFrame(year=[1980,1980], mstat=[2,2], ltcg=[100000,missing])); catch e; e end
-        @test occursin("ltcg", err.msg) && occursin("row(s) 2", err.msg)
+        @test bad(() -> taxsim35(Array{Int64,2}(undef, 2, 3))) isa TaxsimInputError
+        @test bad(() -> taxsim35(DataFrame(year=[], mstat=[]))) isa TaxsimInputError
 
-        # `Union{Missing,T}` with no actual missings is what every column read from real survey
-        # data looks like; the old eltype whitelist rejected it outright.
-        @test T._check_input(CSV.read(IOBuffer("year,mstat,ltcg\n1980,2,100000\n"), DataFrame)) === nothing
-        @test T._check_input(DataFrame(year=Int32[1980], mstat=Int32[2])) === nothing
+        e = bad(() -> taxsim35(DataFrame(yyear=1980, mstat=2)))
+        @test e isa TaxsimInputError && occursin("not an allowed TAXSIM 35 variable", e.msg)
+        @test occursin("did you mean \"year\"", e.msg)
 
-        # Bool and Rational are <: Real but do not serialize to anything TAXSIM accepts
-        @test_throws ErrorException T._check_input(DataFrame(year=1980, mstat=2, ltcg=true))
-        @test_throws ErrorException T._check_input(DataFrame(year=1980, mstat=2, ltcg=1//3))
+        e = bad(() -> taxsim35(DataFrame(year=[1980,1980], mstat=[2,2], ltcg=[1,missing])))
+        @test e isa TaxsimInputError && occursin("row(s) 2", e.msg)
 
-        # variables NBER's taxsim32.ado accepts that the old whitelist was missing
-        for v in ("proptax", "sui", "pui", "dep6", "dep19")
-            @test v in T.TAXSIM32_VARS
-        end
-        @test count(==("rentpaid"), T.TAXSIM32_VARS) == 1
+        e = bad(() -> taxsim35(DataFrame(year=1980, mstat="married")))
+        @test e isa TaxsimInputError && occursin("TAXSIM requires Integer or Float", e.msg)
+
+        # every offending column is reported at once, not just the first
+        e = bad(() -> taxsim35(DataFrame(aaa=1, bbb=2)))
+        @test occursin("aaa", e.msg) && occursin("bbb", e.msg)
+
+        # Union{Missing,T} with no actual missings is what real survey data looks like
+        @test T._check_input(CSV.read(IOBuffer("year,mstat\n1980,2\n"), DataFrame), T.TAXSIM35) === nothing
+        @test T._check_input(DataFrame(year=Int32[1980], mstat=Int32[2]), T.TAXSIM35) === nothing
+        # Bool and Rational are <: Real but do not serialise to anything TAXSIM accepts
+        @test bad(() -> T._check_input(DataFrame(year=1980, mstat=true), T.TAXSIM35)) isa TaxsimInputError
+        @test bad(() -> T._check_input(DataFrame(year=1980, mstat=1//3), T.TAXSIM35)) isa TaxsimInputError
+
+        # v35-only names are rejected by v32
+        @test bad(() -> T._check_input(DataFrame(year=2015, mstat=2, psemp=100), T.TAXSIM32)) isa TaxsimInputError
+        @test T._check_input(DataFrame(year=2015, mstat=2, psemp=100), T.TAXSIM35) === nothing
+    end
+
+    @testset "coverage checks" begin
+        bad(f) = try f(); nothing catch e; e end
+        e = bad(() -> taxsim35(DataFrame(year=2025, mstat=2)))
+        @test e isa TaxsimInputError && occursin("1960", e.msg)
+        @test bad(() -> taxsim35(DataFrame(year=1959, mstat=2))) isa TaxsimInputError
+        # state law starts in 1977
+        e = bad(() -> taxsim35(DataFrame(year=[1970], mstat=[2], state=[5])))
+        @test e isa TaxsimInputError && occursin("1977", e.msg)
+        @test T._check_input(DataFrame(year=[1970], mstat=[2], state=[0]), T.TAXSIM35) === nothing
+        # SOI code range, with the FIPS trap named
+        e = bad(() -> taxsim35(DataFrame(year=2015, mstat=2, state=99)))
+        @test e isa TaxsimInputError && occursin("FIPS", e.msg)
+    end
+
+    @testset "fips_to_taxsim" begin
+        @test fips_to_taxsim(1) == 1 && fips_to_taxsim(2) == 2     # AL, AK agree
+        @test fips_to_taxsim(4) == 3                                # FIPS AZ -> SOI AZ
+        @test fips_to_taxsim(6) == 5                                # FIPS CA -> SOI CA, not 6
+        @test fips_to_taxsim(56) == 51                              # WY
+        @test fips_to_taxsim(0) == 0
+        @test fips_to_taxsim([6, 36, 48]) == [5, 33, 44]
+        @test ismissing(fips_to_taxsim(missing))
+        @test_throws TaxsimInputError fips_to_taxsim(3)             # unused FIPS code
     end
 
     @testset "payload construction" begin
-        payload(df, full) = String(take!(copy(seekstart(T._payload(df, full)))))
+        pay(df; v=T.TAXSIM35, full=false, mtr=T.DEFAULT_MTR) =
+            String(take!(copy(seekstart(T._payload(df, v, full, mtr)))))
 
-        # taxsimid added when absent; idtl carries +10 on the final record only
-        @test payload(DataFrame(year=1980, mstat=2), false) == "taxsimid,year,mstat,idtl\n1,1980,2,10\n"
-        @test payload(DataFrame(year=1980, mstat=2), true) == "taxsimid,year,mstat,idtl\n1,1980,2,12\n"
+        @test pay(DataFrame(year=1980, mstat=2)) == "taxsimid,year,mstat,idtl\n1,1980,2,10\n"
+        @test pay(DataFrame(year=1980, mstat=2); full=true) == "taxsimid,year,mstat,idtl\n1,1980,2,12\n"
 
-        multi = payload(DataFrame(year=[1980,1981,1982], mstat=[2,2,2]), true)
-        @test [split(l, ',')[end] for l in split(chomp(multi), '\n')[2:end]] == ["2", "2", "12"]
-        multi0 = payload(DataFrame(year=[1980,1981,1982], mstat=[2,2,2]), false)
-        @test [split(l, ',')[end] for l in split(chomp(multi0), '\n')[2:end]] == ["0", "0", "10"]
+        three = DataFrame(year=[1980,1981,1982], mstat=[2,2,2])
+        last_col(s) = [split(l, ',')[end] for l in split(chomp(s), '\n')[2:end]]
+        @test last_col(pay(three; full=true)) == ["2", "2", "12"]
+        @test last_col(pay(three)) == ["0", "0", "10"]
 
-        # a caller-supplied taxsimid is respected
-        @test startswith(payload(DataFrame(taxsimid=[7,8], year=[1980,1980], mstat=[2,2]), false),
-                         "taxsimid,year,mstat,idtl\n7,1980,2,0\n8,")
+        # the default mtr emits no column at all, so the default submission is unchanged
+        @test !occursin("mtr", pay(DataFrame(year=1980, mstat=2)))
+        @test occursin("mtr,idtl\n1,1980,2,86,10", pay(DataFrame(year=1980, mstat=2); mtr=:secondary))
+        # mtr may vary per record
+        @test last_col(pay(three; mtr=[:taxpayer, :interest, :none])) == ["0", "0", "10"]
+        @test [split(l, ',')[end-1] for l in split(chomp(pay(three; mtr=[:taxpayer,:interest,:none])), '\n')[2:end]] == ["85", "14", "0"]
 
-        # exact-match lookup: a column merely *containing* "taxsimid" must not suppress the id
-        @test occursin("taxsimid,hh_taxsimid", payload(DataFrame(hh_taxsimid=[5], year=[1980], mstat=[2]), false))
+        @test_throws TaxsimInputError T._payload(three, T.TAXSIM35, false, [:taxpayer])
+        @test_throws TaxsimInputError T._payload(three, T.TAXSIM35, false, :nonsense)
+        @test_throws TaxsimInputError T._payload(DataFrame(year=1980, mstat=2, idtl=2), T.TAXSIM35, false, T.DEFAULT_MTR)
+
+        # a caller-supplied taxsimid is respected; a column merely containing the substring is not
+        @test startswith(pay(DataFrame(taxsimid=[7,8], year=[1980,1980], mstat=[2,2])), "taxsimid,year,mstat,idtl\n7,")
+        @test occursin("taxsimid,hh_taxsimid", pay(DataFrame(hh_taxsimid=[5], year=[1980], mstat=[2])))
     end
 
     @testset "response normalization" begin
         parse_fix(name) = CSV.read(IOBuffer(T._normalize(fixture(name))), DataFrame; delim=',')
 
-        # TAXSIM 32 full output appends a trailing comma to every data row (46 fields against a
-        # 45-field header). Previously this produced a spurious all-missing `Column46`.
-        @test ncol(parse_fix("v32_full_nostate.csv")) == T.TAXSIM32_NCOL_FULL
-        @test ncol(parse_fix("v32_full_state.csv")) == T.TAXSIM32_NCOL_FULL
-        @test ncol(parse_fix("v32_full_2rows.csv")) == T.TAXSIM32_NCOL_FULL
-        @test nrow(parse_fix("v32_full_2rows.csv")) == 2
-        @test ncol(parse_fix("v32_default_nostate.csv")) == T.TAXSIM32_NCOL_DEFAULT
-        for name in ("v32_full_nostate.csv", "v32_full_state.csv", "v32_default_nostate.csv")
-            @test !any(startswith.(names(parse_fix(name)), "Column"))
+        # TAXSIM 32 appends a trailing comma to every full-detail row (46 against 45)
+        for name in ("v32_full_nostate.csv", "v32_full_state.csv", "v32_full_2rows.csv")
+            d = parse_fix(name)
+            @test ncol(d) == T.NCOL_FULL[32]
+            @test !any(startswith.(names(d), "Column"))
         end
+        @test nrow(parse_fix("v32_full_2rows.csv")) == 2
+        @test ncol(parse_fix("v32_default_nostate.csv")) == T.NCOL_DEFAULT[32]
+        @test ncol(parse_fix("v35_default_nostate.csv")) == T.NCOL_DEFAULT[35]
 
-        # v30 is populated even with no state, which is why the old drop of v30:v41 was lossy
+        # v35 is wider, interleaves named columns, and pads two header names
+        d35 = parse_fix("v35_full_state.csv")
+        @test ncol(d35) == T.NCOL_FULL[35]
+        @test names(d35)[[10, 11, 44]] == ["tfica", "credits", "staxbc"]
+        @test names(d35)[23] == "v21" && names(d35)[37] == "v35"
+
+        # neither server drops state columns when no state is given, and v30 is populated -
+        # which is why the old client-side drop of v30:v41 was lossy
+        @test ncol(parse_fix("v35_full_nostate.csv")) == T.NCOL_FULL[35]
         @test parse_fix("v32_full_nostate.csv").v30[1] != 0
 
-        # TAXSIM 35 pads two header names with spaces
-        d35 = parse_fix("v35_full_state.csv")
-        @test ncol(d35) == 48
-        @test names(d35)[23] == "v21" && names(d35)[37] == "v35"
-        @test names(d35)[10] == "tfica" && names(d35)[11] == "credits" && names(d35)[44] == "staxbc"
-
-        # server-side errors are surfaced, not parsed into a garbage frame
         err = try T._normalize(fixture("v32_error_badyear.csv")); catch e; e end
-        @test err isa ErrorException
-        @test occursin("Federal tax calculator available 1960 - 2023 only", err.msg)
+        @test err isa TaxsimServerError
+        @test occursin("1960 - 2023 only", err.msg)
 
-        # a width mismatch of any other shape must not be silently guessed at
-        @test_throws ErrorException T._normalize("a,b,c\n1,2,3,4,5\n")
-        @test_throws ErrorException T._normalize("")
-        @test_throws ErrorException T._normalize("a,b,c\n")
+        @test_throws TaxsimServerError T._normalize("a,b,c\n1,2,3,4,5\n")
+        @test_throws TaxsimServerError T._normalize("")
+        @test_throws TaxsimServerError T._normalize("a,b,c\n")
+        # the HTTP endpoint prefixes the body with a blank line
+        @test ncol(CSV.read(IOBuffer(T._normalize("\n" * fixture("v32_default_nostate.csv"))), DataFrame)) == T.NCOL_DEFAULT[32]
     end
 
-    @testset "long names" begin
-        d = CSV.read(IOBuffer(T._normalize(fixture("v32_full_state.csv"))), DataFrame; delim=',')
-        n = names(T._apply_long_names!(copy(d)))
-        @test n[9] == "FICA rate"
-        @test n[end] == "CARES act Recovery Rebates"
-        @test length(n) == length(unique(n))
+    @testset "offline end-to-end" begin
+        df = DataFrame(year=1980, mstat=2, ltcg=100000)
 
-        # renaming is keyed by name, so an unknown column keeps the server's own name instead
-        # of throwing or shifting every label after it
-        extra = hcat(copy(d), DataFrame(v99=[0.0]))
-        @test names(T._apply_long_names!(extra))[end] == "v99"
+        o32 = T._taxsim(df, T.TAXSIM32; _transport=replay("v32_default_nostate.csv"))
+        @test ncol(o32) == T.NCOL_DEFAULT[32] && o32.fiitax[1] == 10920.0
+        @test metadata(o32, "taxsim_version") == 32
+
+        o35 = T._taxsim(df, T.TAXSIM35; _transport=replay("v35_default_nostate.csv"))
+        @test ncol(o35) == T.NCOL_DEFAULT[35] && "tfica" in names(o35)
+        @test metadata(o35, "taxsim_version") == 35
+
+        # long names are applied by name, so an unknown column keeps the server's own
+        ol = T._taxsim(df, T.TAXSIM35; long_names=true, _transport=replay("v35_full_state.csv"))
+        @test ncol(ol) == T.NCOL_FULL[35]
+        @test names(ol)[10] == "Taxpayer share of FICA"
+        @test length(names(ol)) == length(unique(names(ol)))
+
+        # taxsimid comes back as the input's integer type rather than the server's Float64
+        oi = T._taxsim(DataFrame(taxsimid=Int32[1], year=[1980], mstat=[2]), T.TAXSIM35;
+                       _transport=replay("v35_default_nostate.csv"))
+        @test eltype(oi.taxsimid) == Int32
+
+        # a truncated response must not be returned as if it were complete
+        two = DataFrame(year=[1980,1981], mstat=[2,1])
+        @test_throws TaxsimServerError T._taxsim(two, T.TAXSIM32; _transport=replay("v32_default_nostate.csv"))
+    end
+
+    @testset "v32 is a frozen build" begin
+        # The two versions agree through 2021 and diverge afterwards; these fixtures pin that so
+        # it is caught by the suite rather than discovered in a referee report.
+        p(n) = CSV.read(IOBuffer(T._normalize(fixture(n))), DataFrame; delim=',')
+        a, b = p("v32_2022_ca.csv"), p("v35_2022_ca.csv")
+        @test a.fiitax[1] == b.fiitax[1]        # federal 2022 agrees
+        @test a.siitax[1] != b.siitax[1]        # state 2022 does not
+        @test a.srate[1] == 6.00 && b.srate[1] == 9.30
+
+        @test_logs (:warn, r"frozen") match_mode=:any T._warn_stale_v32(DataFrame(year=[2022], mstat=[2]))
+        @test T._warn_stale_v32(DataFrame(year=[2019], mstat=[2])) === nothing
     end
 
     @testset "connection argument" begin
-        df = DataFrame(year=1980, mstat=2, ltcg=100000)
-        for ftp in ("FTP", "ftp", :ftp)
-            e = try taxsim32(df, connection=ftp); catch e; e end
-            @test e isa ErrorException && occursin("FTP connection has been removed", e.msg)
+        @test T._normalize_connection(:ssh) === :ssh
+        @test T._normalize_connection(:http) === :http
+        @test T._normalize_connection(:ssh_only) === :ssh_only
+        for ftp in (:ftp,)
+            e = try T._normalize_connection(ftp); catch e; e end
+            @test e isa TaxsimTransportError && occursin("FTP connection has been removed", e.msg)
         end
-        e = try taxsim32(df, connection="carrier pigeon"); catch e; e end
-        @test e isa ErrorException && occursin("Unknown connection", e.msg)
+        @test_throws ArgumentError T._normalize_connection(:carrier_pigeon)
+        # string values still work, deprecated
+        @test T._normalize_connection("SSH") === :ssh
+        @test T._normalize_connection("http") === :http
     end
 
     if LIVE
-        @testset "live: SSH round trip" begin
+        @testset "live: both versions over SSH" begin
             df  = DataFrame(year=1980, mstat=2, ltcg=100000)
             dfs = DataFrame(year=1980, mstat=2, pwages=0, ltcg=100000, state=1)
 
-            out = taxsim32(df)
-            @test out isa DataFrame
-            @test ncol(out) == T.TAXSIM32_NCOL_DEFAULT
-            @test out.fiitax[1] == 10920.0
-            @test out.frate[1] == 20.0
+            o = taxsim32(df)
+            @test ncol(o) == T.NCOL_DEFAULT[32] && o.fiitax[1] == 10920.0 && o.frate[1] == 20.0
+            @test ncol(taxsim35(df)) == T.NCOL_DEFAULT[35]
 
-            outs = taxsim32(dfs)
-            @test outs.siitax[1] == 1119.0
-            @test outs.srate[1] == 4.0
+            @test ncol(taxsim32(dfs, full=true)) == T.NCOL_FULL[32]
+            @test ncol(taxsim35(dfs, full=true)) == T.NCOL_FULL[35]
+            @test ncol(taxsim35(dfs, full=true, long_names=true)) == T.NCOL_FULL[35]
 
-            # state columns are retained whether or not a state was supplied
-            @test ncol(taxsim32(df, full=true)) == T.TAXSIM32_NCOL_FULL
-            @test ncol(taxsim32(dfs, full=true)) == T.TAXSIM32_NCOL_FULL
-            @test ncol(taxsim32(dfs, full=true, long_names=true)) == T.TAXSIM32_NCOL_FULL
+            os = taxsim32(dfs)
+            @test os.siitax[1] == 1119.0 && os.srate[1] == 4.0
 
             df2 = DataFrame(year=[1980,1981], mstat=[2,1], pwages=[0,100000], ltcg=[100000,0], state=[1,5])
             o2 = taxsim32(df2, full=true)
-            @test nrow(o2) == 2
-            @test o2.fiitax == [10920.0, 38344.85]
-            @test o2.siitax == [1119.0, 9559.5]
+            @test nrow(o2) == 2 && o2.fiitax == [10920.0, 38344.85]
 
             N = 100
             dfN = DataFrame(year=fill(1980,N), mstat=fill(2,N), ltcg=fill(100000,N), state=fill(1,N))
-            oN = taxsim32(dfN, full=true)
-            @test nrow(oN) == N
-            @test oN.fiitax[N] == 10920.0
+            @test nrow(taxsim35(dfN, full=true)) == N
+        end
 
-            # server-side rejection surfaces as the server's own message
-            e = try taxsim32(DataFrame(year=2025, mstat=2, pwages=100000)); catch e; e end
-            @test e isa ErrorException && occursin("TAXSIM", e.msg)
+        @testset "live: mtr margins" begin
+            d = DataFrame(year=2015, mstat=2, pwages=100000, swages=20000, intrec=5000)
+            # the FICA marginal rate is zero at a margin that is not FICA-taxable
+            @test taxsim35(d, mtr=:taxpayer).ficar[1] > 0
+            @test taxsim35(d, mtr=:interest).ficar[1] == 0
+        end
+
+        @testset "live: HTTP transport" begin
+            df = DataFrame(year=1980, mstat=2, ltcg=100000)
+            @test ncol(taxsim32(df, connection=:http)) == T.NCOL_DEFAULT[32]
+            @test ncol(taxsim35(df, connection=:http)) == T.NCOL_DEFAULT[35]
+        end
+
+        @testset "live: provenance" begin
+            @test occursin("v35", taxsim_server_version(35))
+            @test occursin("v32", taxsim_server_version(32))
         end
 
         @testset "live: fixtures still match the server" begin
-            # A canary, not a unit test: if this fails, NBER changed the layout and the
-            # recorded fixtures (and probably the parsing) need revisiting.
-            got = T._ssh(T._payload(DataFrame(year=1980, mstat=2, ltcg=100000), true))
-            @test split(chomp(fixture("v32_full_nostate.csv")), '\n')[1] == split(chomp(got), '\n')[1]
+            # A canary, not a unit test: a failure here means NBER changed the layout and the
+            # fixtures (and probably the parsing) need revisiting.
+            for (v, name, full) in ((T.TAXSIM32, "v32_full_nostate.csv", true),
+                                    (T.TAXSIM35, "v35_full_nostate.csv", true))
+                got = T._submit(v, T._payload(DataFrame(year=1980, mstat=2, ltcg=100000), v, full, T.DEFAULT_MTR))
+                @test split(chomp(fixture(name)), '\n')[1] == split(chomp(got), '\n')[1]
+            end
         end
     end
 end
