@@ -114,6 +114,24 @@ out = taxsim35(df)
 mean_tax = sum(out.fiitax .* df.wtsupp) / sum(df.wtsupp)
 ```
 
+### Large datasets
+
+The submission is streamed straight into the transport and shares your column vectors rather
+than copying them, so the request side costs almost nothing: augmenting a million-row frame
+allocates about a kilobyte beyond the `idtl` column itself.
+
+The **response** is the limit. A `full` TAXSIM 35 request returns 48 `Float64` columns, so
+10 million returns is roughly 3.8 GB in the resulting `DataFrame`, and NBER's help file
+mentions users submitting 46 million records. If your data is that large, submit it in pieces
+and write each result to disk — the package does not yet stream results to a file.
+
+Any Tables.jl source works as input, so a `CSV.File` or Arrow table can go in without a
+`DataFrame` round trip:
+
+```julia
+taxsim35(CSV.File("returns.csv"))
+```
+
 ### Confidential data
 
 The transport sends individual-level income records to an external server over a channel that does not verify NBER's host key beyond first use. **Check your data use agreement before submitting restricted-use microdata.** NBER also distributes standalone executables that run the same calculator locally; support for those is planned.

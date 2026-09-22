@@ -2,6 +2,7 @@ module Taxsim
 
 using DataFrames
 using CSV
+using Tables
 
 include("errors.jl")
 include("versions.jl")

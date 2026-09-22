@@ -3,15 +3,19 @@ const SSH_PORTS = (22, 443)
 const DEFAULT_TIMEOUT = 600
 
 """
-    _run_capture(cmd, stdin_io, timeout) -> (stdout, stderr, ok)
+    _run_stream(cmd, table, timeout) -> (stdout, stderr, ok)
 
-Run `cmd` with an overall watchdog. `ConnectTimeout` only covers the SSH handshake, so a
-stalled transfer would otherwise block Julia indefinitely.
+Serialise `table` straight into the process's stdin rather than materialising the whole
+submission in memory first, and enforce an overall watchdog: `ConnectTimeout` covers only the
+SSH handshake, so a stalled transfer would otherwise block Julia indefinitely.
+
+`table` rather than a buffer, because a retry against the next host has to re-serialise anyway
+and buffering a multi-million-row submission is the thing this avoids.
 """
-function _run_capture(cmd, stdin_io, timeout)
+function _run_stream(cmd, table, timeout)
     out, err = IOBuffer(), IOBuffer()
     proc = try
-        run(pipeline(cmd, stdin = stdin_io, stdout = out, stderr = err); wait = false)
+        open(pipeline(cmd, stdout = out, stderr = err), "w")
     catch e
         return "", sprint(showerror, e), false
     end
@@ -24,9 +28,12 @@ function _run_capture(cmd, stdin_io, timeout)
         end
     end
     try
+        table === nothing || CSV.write(proc.in, table)
+        close(proc.in)
         wait(proc)
     catch
-        # a killed or failed process is reported through `ok` below
+        # a dead process gives EPIPE here; the outcome is reported through `ok` below
+        try close(proc.in) catch end
     finally
         close(timer)
     end
@@ -45,12 +52,12 @@ _looks_like_server_message(s::AbstractString) =
     occursin("TAXSIM:", s) || occursin(r"^\s*STOP\b"m, s)
 
 """
-    _submit_ssh(v, payload; timeout) -> String
+    _submit_ssh(v, table; timeout) -> String
 
 Try both NBER hosts on ports 22 and 443, first success wins. Port 443 matters for networks
 that block 22.
 """
-function _submit_ssh(v::TaxsimVersion, payload; timeout = DEFAULT_TIMEOUT)
+function _submit_ssh(v::TaxsimVersion, table; timeout = DEFAULT_TIMEOUT)
     Sys.which("ssh") === nothing && throw(TaxsimTransportError(
         "No `ssh` executable on PATH. On Windows, enable OpenSSH under " *
         "Apps > Optional Features, or pass connection = :http."))
@@ -62,7 +69,7 @@ function _submit_ssh(v::TaxsimVersion, payload; timeout = DEFAULT_TIMEOUT)
         # option disables that path and breaks the connection outright. Hang protection is the
         # watchdog in `_run_capture`, not an ssh flag.
         cmd = `ssh -p $port -T -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new $(v.account)@$host`
-        out, err, ok = _run_capture(cmd, seekstart(payload), timeout)
+        out, err, ok = _run_stream(cmd, table, timeout)
 
         _looks_like_server_message(out) && return out
         (ok && !isempty(strip(out))) && return out
@@ -76,24 +83,24 @@ function _submit_ssh(v::TaxsimVersion, payload; timeout = DEFAULT_TIMEOUT)
 end
 
 """
-    _submit_http(v, payload; timeout) -> String
+    _submit_http(v, table; timeout) -> String
 
 Multipart POST to NBER's CGI endpoint. Needs no `ssh` binary, which is the point: it is the
 fallback for Windows machines without OpenSSH and for firewalls that block 22 and 443 alike.
 
 NBER's help file warns that http submissions have failed above roughly 5,000 records.
 """
-function _submit_http(v::TaxsimVersion, payload; timeout = DEFAULT_TIMEOUT)
+function _submit_http(v::TaxsimVersion, table; timeout = DEFAULT_TIMEOUT)
     Sys.which("curl") === nothing && throw(TaxsimTransportError(
         "No `curl` executable on PATH, which the HTTP connection requires."))
 
     # The CGI rejects a streamed body: it needs a real multipart filename.
     path, io = mktemp()
     try
-        write(io, take!(copy(seekstart(payload))))
         close(io)
+        CSV.write(path, table)
         cmd = `curl -sS --max-time $timeout -F txpydata=@$path $(v.http_url)`
-        out, err, ok = _run_capture(cmd, devnull, timeout + 5)
+        out, err, ok = _run_stream(cmd, nothing, timeout + 5)
 
         _looks_like_server_message(out) && return out
         (ok && !isempty(strip(out))) && return out
@@ -105,27 +112,27 @@ function _submit_http(v::TaxsimVersion, payload; timeout = DEFAULT_TIMEOUT)
 end
 
 """
-    _submit(v, payload; connection, timeout) -> String
+    _submit(v, table; connection, timeout) -> String
 
 Dispatch to a transport. `:ssh` falls back to HTTP when every SSH endpoint fails, warning when
 it does so — the HTTP TAXSIM 35 endpoint is an older build than the SSH one and can return
 slightly different values, so the substitution must never be silent.
 """
-function _submit(v::TaxsimVersion, payload; connection::Symbol = :ssh, timeout = DEFAULT_TIMEOUT)
+function _submit(v::TaxsimVersion, table; connection::Symbol = :ssh, timeout = DEFAULT_TIMEOUT)
     if connection === :http
-        return _submit_http(v, payload; timeout)
+        return _submit_http(v, table; timeout)
     elseif connection === :ssh
         try
-            return _submit_ssh(v, payload; timeout)
+            return _submit_ssh(v, table; timeout)
         catch e
             e isa TaxsimTransportError || rethrow()
             @warn "SSH transport failed; falling back to HTTP. Note NBER's HTTP endpoint for " *
                   "TAXSIM $(v.number) may be an older build than the SSH one, so results can " *
                   "differ slightly. Pass connection = :ssh_only to disable this fallback." exception = e
-            return _submit_http(v, payload; timeout)
+            return _submit_http(v, table; timeout)
         end
     elseif connection === :ssh_only
-        return _submit_ssh(v, payload; timeout)
+        return _submit_ssh(v, table; timeout)
     else
         throw(ArgumentError("Unknown connection $(repr(connection)); use :ssh, :ssh_only or :http"))
     end

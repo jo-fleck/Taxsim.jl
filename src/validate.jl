@@ -1,30 +1,38 @@
 """
-    _check_input(df, v::TaxsimVersion)
+    _check_input(x, v::TaxsimVersion; missing_action = :error)
 
-Validate `df` against what the given TAXSIM version accepts, reporting every offending column
-at once rather than throwing on the first.
+Validate `x` against what the given TAXSIM version accepts, reporting every offending column at
+once rather than throwing on the first. Accepts any Tables.jl source, not only a `DataFrame`.
 """
-function _check_input(df, v::TaxsimVersion)
-    df isa DataFrame || throw(TaxsimInputError("Input must be a data frame"))
-    isempty(df) && throw(TaxsimInputError("Input data frame is empty"))
+function _check_input(x, v::TaxsimVersion; missing_action::Symbol = :error)
+    Tables.istable(x) || throw(TaxsimInputError(
+        "Input must be a table such as a DataFrame, but got $(typeof(x))"))
+
+    cols = Tables.columns(x)
+    Tables.rowcount(cols) == 0 && throw(TaxsimInputError("Input table is empty"))
 
     allowed = vcat(v.inputs, CONTROL_VARS)
     problems = String[]
 
-    for (name, col) in pairs(eachcol(df))
+    for name in Tables.columnnames(cols)
         var = String(name)
+        col = Tables.getcolumn(cols, name)
 
         if !(var in allowed)
-            hint = _did_you_mean(var, allowed)
-            push!(problems, "\"$var\" is not an allowed TAXSIM $(v.number) variable name" * hint)
+            push!(problems, "\"$var\" is not an allowed TAXSIM $(v.number) variable name" *
+                            _did_you_mean(var, allowed))
             continue
         end
 
-        bad = findall(ismissing, col)
-        if !isempty(bad)
-            shown = join(first(bad, 5), ", ") * (length(bad) > 5 ? ", …" : "")
-            push!(problems, "\"$var\" has missing value(s) in row(s) $shown, which TAXSIM does not accept")
-            continue
+        if missing_action === :error
+            bad = findall(ismissing, col)
+            if !isempty(bad)
+                shown = join(first(bad, 5), ", ") * (length(bad) > 5 ? ", …" : "")
+                push!(problems, "\"$var\" has missing value(s) in row(s) $shown. TAXSIM does " *
+                                "not accept them; pass missing_action = :zero to send zeros " *
+                                "instead, which is how TAXSIM treats absent inputs anyway")
+                continue
+            end
         end
 
         # `Union{Missing,T}` is what every column read from real survey data looks like, so the
@@ -39,7 +47,7 @@ function _check_input(df, v::TaxsimVersion)
     isempty(problems) || throw(TaxsimInputError(
         "Input is not acceptable to TAXSIM $(v.number):\n  " * join(problems, "\n  ")))
 
-    _check_coverage(df, v)
+    _check_coverage(cols, v)
     return nothing
 end
 
@@ -74,25 +82,27 @@ function _edit1(a::AbstractString, b::AbstractString)
 end
 
 """
-    _check_coverage(df, v)
+    _check_coverage(cols, v)
 
 Catch out-of-range years and state codes locally. The server rejects these record by record,
 which on a large submission wastes the whole round trip.
 """
-function _check_coverage(df, v::TaxsimVersion)
-    names_ = names(df)
+function _check_coverage(cols, v::TaxsimVersion)
+    names_ = String.(Tables.columnnames(cols))
+    col(n) = Tables.getcolumn(cols, Symbol(n))
 
     if "year" in names_
-        yrs = df[!, "year"]
-        bad = unique(y for y in yrs if !(floor(Int, y) in FEDERAL_YEARS))
+        yrs = col("year")
+        bad = unique(y for y in yrs if !ismissing(y) && !(floor(Int, y) in FEDERAL_YEARS))
         isempty(bad) || throw(TaxsimInputError(
             "TAXSIM computes federal law for $(first(FEDERAL_YEARS))–$(last(FEDERAL_YEARS)) only, " *
             "but `year` contains $(join(sort(collect(bad)), ", ")). " *
             "State law is coded from $STATE_FIRST_YEAR and extrapolated after 2021."))
 
         if "state" in names_
-            st = df[!, "state"]
-            early = findall(i -> yrs[i] < STATE_FIRST_YEAR && st[i] != 0, eachindex(yrs))
+            st = col("state")
+            early = findall(i -> !ismissing(yrs[i]) && !ismissing(st[i]) &&
+                                 yrs[i] < STATE_FIRST_YEAR && st[i] != 0, eachindex(yrs))
             isempty(early) || throw(TaxsimInputError(
                 "TAXSIM has no state law before $STATE_FIRST_YEAR, so `state` must be 0 for " *
                 "earlier years. Offending row(s): $(join(first(early, 5), ", "))."))
@@ -100,7 +110,7 @@ function _check_coverage(df, v::TaxsimVersion)
     end
 
     if "state" in names_
-        bad = unique(s for s in df[!, "state"] if !(0 <= s <= MAX_STATE_CODE))
+        bad = unique(s for s in col("state") if !ismissing(s) && !(0 <= s <= MAX_STATE_CODE))
         isempty(bad) || throw(TaxsimInputError(
             "`state` must be an SOI code between 0 and $MAX_STATE_CODE, but contains " *
             "$(join(sort(collect(bad)), ", ")). Note TAXSIM uses SOI codes (1 Alabama, " *

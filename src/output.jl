@@ -59,12 +59,14 @@ The server returns `taxsimid` as a float (`1.`). Callers who supplied integer pe
 then `leftjoin` on it would hit a type mismatch, so put the input's type back when the values
 are integral.
 """
-function _restore_taxsimid!(df_res, df_in)
+function _restore_taxsimid!(df_res, x)
     "taxsimid" in names(df_res) || return df_res
     col = df_res[!, "taxsimid"]
     all(isinteger, skipmissing(col)) || return df_res
 
-    T = ("taxsimid" in names(df_in)) ? nonmissingtype(eltype(df_in[!, "taxsimid"])) : Int
+    incols = Tables.columns(x)
+    T = (:taxsimid in Tables.columnnames(incols)) ?
+        nonmissingtype(eltype(Tables.getcolumn(incols, :taxsimid))) : Int
     T <: Integer || return df_res
     df_res[!, "taxsimid"] = convert.(T, col)
     return df_res

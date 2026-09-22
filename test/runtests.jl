@@ -2,6 +2,7 @@ using Taxsim
 using Test
 using DataFrames
 using CSV
+using Tables
 
 const T = Taxsim
 const FIX = joinpath(@__DIR__, "fixtures")
@@ -31,6 +32,7 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
 
         @test bad(() -> taxsim35(Array{Int64,2}(undef, 2, 3))) isa TaxsimInputError
         @test bad(() -> taxsim35(DataFrame(year=[], mstat=[]))) isa TaxsimInputError
+        @test bad(() -> taxsim35("not a table")) isa TaxsimInputError
 
         e = bad(() -> taxsim35(DataFrame(yyear=1980, mstat=2)))
         @test e isa TaxsimInputError && occursin("not an allowed TAXSIM 35 variable", e.msg)
@@ -85,7 +87,7 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
 
     @testset "payload construction" begin
         pay(df; v=T.TAXSIM35, full=false, mtr=T.DEFAULT_MTR) =
-            String(take!(copy(seekstart(T._payload(df, v, full, mtr)))))
+            T._payload_string(T._table(df, v, full, mtr))
 
         @test pay(DataFrame(year=1980, mstat=2)) == "taxsimid,year,mstat,idtl\n1,1980,2,10\n"
         @test pay(DataFrame(year=1980, mstat=2); full=true) == "taxsimid,year,mstat,idtl\n1,1980,2,12\n"
@@ -102,9 +104,9 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
         @test last_col(pay(three; mtr=[:taxpayer, :interest, :none])) == ["0", "0", "10"]
         @test [split(l, ',')[end-1] for l in split(chomp(pay(three; mtr=[:taxpayer,:interest,:none])), '\n')[2:end]] == ["85", "14", "0"]
 
-        @test_throws TaxsimInputError T._payload(three, T.TAXSIM35, false, [:taxpayer])
-        @test_throws TaxsimInputError T._payload(three, T.TAXSIM35, false, :nonsense)
-        @test_throws TaxsimInputError T._payload(DataFrame(year=1980, mstat=2, idtl=2), T.TAXSIM35, false, T.DEFAULT_MTR)
+        @test_throws TaxsimInputError T._table(three, T.TAXSIM35, false, [:taxpayer])
+        @test_throws TaxsimInputError T._table(three, T.TAXSIM35, false, :nonsense)
+        @test_throws TaxsimInputError T._table(DataFrame(year=1980, mstat=2, idtl=2), T.TAXSIM35, false, T.DEFAULT_MTR)
 
         # a caller-supplied taxsimid is respected; a column merely containing the substring is not
         @test startswith(pay(DataFrame(taxsimid=[7,8], year=[1980,1980], mstat=[2,2])), "taxsimid,year,mstat,idtl\n7,")
@@ -186,6 +188,33 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
         @test T._warn_stale_v32(DataFrame(year=[2019], mstat=[2])) === nothing
     end
 
+    @testset "Tables.jl sources and missing_action" begin
+        df = DataFrame(year=1980, mstat=2, ltcg=100000)
+        expected = T._payload_string(T._table(df, T.TAXSIM35, false, T.DEFAULT_MTR))
+
+        # any Tables.jl source produces the same submission as the equivalent DataFrame
+        for src in ((; year=[1980], mstat=[2], ltcg=[100000]),
+                    Tables.rowtable((; year=[1980], mstat=[2], ltcg=[100000])),
+                    CSV.File(IOBuffer("year,mstat,ltcg\n1980,2,100000\n")))
+            @test T._payload_string(T._table(src, T.TAXSIM35, false, T.DEFAULT_MTR)) == expected
+        end
+
+        # the augmented table shares the caller's column vectors instead of copying them
+        big = DataFrame(year=fill(1980, 10_000), mstat=fill(2, 10_000))
+        tbl = T._table(big, T.TAXSIM35, false, T.DEFAULT_MTR)
+        @test tbl.year === big.year && tbl.mstat === big.mstat
+        @test Tables.istable(tbl)
+
+        # missing_action
+        dm = DataFrame(year=[1980,1980], mstat=[2,2], ltcg=[100000,missing])
+        @test_throws TaxsimInputError T._check_input(dm, T.TAXSIM35)
+        @test T._check_input(dm, T.TAXSIM35; missing_action=:zero) === nothing
+        zeroed = T._payload_string(T._table(dm, T.TAXSIM35, false, T.DEFAULT_MTR, :zero))
+        @test occursin("1980,2,0,", zeroed)
+        # a column with no missings is still shared, not rebuilt
+        @test T._table(dm, T.TAXSIM35, false, T.DEFAULT_MTR, :zero).year === dm.year
+    end
+
     @testset "connection argument" begin
         @test T._normalize_connection(:ssh) === :ssh
         @test T._normalize_connection(:http) === :http
@@ -248,7 +277,7 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
             # fixtures (and probably the parsing) need revisiting.
             for (v, name, full) in ((T.TAXSIM32, "v32_full_nostate.csv", true),
                                     (T.TAXSIM35, "v35_full_nostate.csv", true))
-                got = T._submit(v, T._payload(DataFrame(year=1980, mstat=2, ltcg=100000), v, full, T.DEFAULT_MTR))
+                got = T._submit(v, T._table(DataFrame(year=1980, mstat=2, ltcg=100000), v, full, T.DEFAULT_MTR))
                 @test split(chomp(fixture(name)), '\n')[1] == split(chomp(got), '\n')[1]
             end
         end

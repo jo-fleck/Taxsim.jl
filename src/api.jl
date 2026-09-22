@@ -17,36 +17,57 @@ function _mtr_column(mtr, n::Int)
 end
 
 """
-    _payload(df_in, v, full, mtr) -> IOBuffer
+    _table(x, v, full, mtr, missing_action) -> NamedTuple
 
-Build the CSV submitted to the server: adds `taxsimid` if absent, optionally an `mtr` column,
-and `idtl` with `+10` on the final record to mark end-of-file.
+Build the submission as a `NamedTuple` that **shares** the caller's column vectors rather than
+copying them: adds `taxsimid` if absent, optionally an `mtr` column, and `idtl` with `+10` on
+the final record to mark end-of-file.
+
+The previous `deepcopy` plus two `insertcols!` allocated a full duplicate of the input. On a
+million rows this form allocates ~1 KB of overhead against ~80 MB, everything else being the
+unavoidable `idtl` vector. Combined with streaming it into the transport, a submission is never
+materialised in memory.
 """
-function _payload(df_in, v::TaxsimVersion, full::Bool, mtr)
-    df = deepcopy(df_in)
-    n = nrow(df)
+function _table(x, v::TaxsimVersion, full::Bool, mtr, missing_action::Symbol = :error)
+    cols = Tables.columns(x)
+    nms = String.(Tables.columnnames(cols))
+    n = Tables.rowcount(cols)
 
-    "idtl" in names(df) && throw(TaxsimInputError(
+    "idtl" in nms && throw(TaxsimInputError(
         "Do not supply an `idtl` column; use the `full` keyword. TAXSIM requires one detail " *
         "level per submission and silently returns ragged output when it varies."))
 
+    prepared = Pair{Symbol,Any}[]
+
     # Exact match, not `occursin`: a substring test meant a column named e.g. `hh_taxsimid`
     # silently suppressed id generation and corrupted the caller's join.
-    "taxsimid" in names(df) || insertcols!(df, 1, :taxsimid => 1:n)
+    "taxsimid" in nms || push!(prepared, :taxsimid => Base.OneTo(n))
+
+    for name in Tables.columnnames(cols)
+        col = Tables.getcolumn(cols, name)
+        # Only a column that actually holds missings is materialised; the rest stay shared.
+        if missing_action === :zero && eltype(col) >: Missing && any(ismissing, col)
+            col = coalesce.(col, 0)
+        end
+        push!(prepared, Symbol(name) => col)
+    end
 
     mcol = _mtr_column(mtr, n)
     if mcol !== nothing
-        "mtr" in names(df) && throw(TaxsimInputError(
+        "mtr" in nms && throw(TaxsimInputError(
             "Both an `mtr` column and a non-default `mtr` keyword were given; use one or the other."))
-        insertcols!(df, ncol(df) + 1, :mtr => mcol)
+        push!(prepared, :mtr => mcol)
     end
 
     idtl = fill(full ? 2 : 0, n)
     idtl[end] += 10
-    insertcols!(df, ncol(df) + 1, :idtl => idtl)
+    push!(prepared, :idtl => idtl)
 
-    return CSV.write(IOBuffer(), df)
+    return (; prepared...)
 end
+
+"Serialise a submission, for the HTTP transport and for tests that assert payload bytes."
+_payload_string(table) = String(take!(CSV.write(IOBuffer(), table)))
 
 _conn_check(c::Symbol) =
     c === :ftp ? throw(TaxsimTransportError(
@@ -62,21 +83,27 @@ function _normalize_connection(c::AbstractString)
     return _conn_check(Symbol(lowercase(c)))
 end
 
-function _taxsim(df_in, v::TaxsimVersion; full = false, long_names = false, mtr = DEFAULT_MTR,
+function _taxsim(x, v::TaxsimVersion; full = false, long_names = false, mtr = DEFAULT_MTR,
                  checks = true, connection = :ssh, timeout = DEFAULT_TIMEOUT,
-                 _transport = _submit)
+                 missing_action::Symbol = :error, _transport = _submit)
 
     conn = _normalize_connection(connection)
-    checks && _check_input(df_in, v)
+    missing_action in (:error, :zero) ||
+        throw(ArgumentError("missing_action must be :error or :zero, got $(repr(missing_action))"))
 
-    raw = _transport(v, _payload(df_in, v, full, mtr); connection = conn, timeout = timeout)
+    checks && _check_input(x, v; missing_action)
+
+    table = _table(x, v, full, mtr, missing_action)
+    n_in = length(table.idtl)
+
+    raw = _transport(v, table; connection = conn, timeout = timeout)
     df_res = CSV.read(IOBuffer(_normalize(raw)), DataFrame; delim = ',')
 
-    nrow(df_res) == nrow(df_in) || throw(TaxsimServerError(
-        "Sent $(nrow(df_in)) records but TAXSIM returned $(nrow(df_res)). The response was " *
+    nrow(df_res) == n_in || throw(TaxsimServerError(
+        "Sent $n_in records but TAXSIM returned $(nrow(df_res)). The response was " *
         "truncated; do not use these results."))
 
-    _restore_taxsimid!(df_res, df_in)
+    _restore_taxsimid!(df_res, x)
     long_names && _apply_long_names!(df_res)
 
     # Provenance: which calculator produced these numbers. NBER runs several builds
@@ -102,6 +129,8 @@ const _KWDOC = """
   HTTP with a warning if all fail; `:ssh_only` disables that fallback; `:http` posts to NBER's
   CGI endpoint, which needs no `ssh` binary but is reported to fail above ~5,000 records.
 - `timeout`: seconds before the transfer is abandoned. Defaults to $(DEFAULT_TIMEOUT).
+- `missing_action`: `:error` (default) rejects `missing` values, naming the offending rows;
+  `:zero` sends zeros instead, which is how TAXSIM treats absent inputs anyway.
 - `checks`: validate the input before submitting. Defaults to `true`.
 
 #### Output
@@ -117,8 +146,8 @@ are attached as DataFrame metadata.
 Compute federal and state income tax liabilities with [TAXSIM
 35](https://taxsim.nber.org/taxsim35/), NBER's current release.
 
-`df` must be a `DataFrame` with at least one row, whose columns are named exactly as in NBER's
-TAXSIM 35 variable list (45 names; order does not matter). Unsupplied variables are treated as
+`df` may be a `DataFrame` or any other Tables.jl source with at least one row, whose columns are
+named exactly as in NBER's TAXSIM 35 variable list (45 names; order does not matter). Unsupplied variables are treated as
 zero by the server. `missing` values are rejected, naming the offending rows.
 
 !!! warning "state uses SOI codes, not FIPS"
@@ -168,9 +197,11 @@ function taxsim32(df; kwargs...)
     return _taxsim(df, TAXSIM32; kwargs...)
 end
 
-function _warn_stale_v32(df)
-    (df isa DataFrame && "year" in names(df)) || return nothing
-    yrs = skipmissing(df[!, "year"])
+function _warn_stale_v32(x)
+    Tables.istable(x) || return nothing
+    cols = Tables.columns(x)
+    (:year in Tables.columnnames(cols)) || return nothing
+    yrs = skipmissing(Tables.getcolumn(cols, :year))
     any(>=(2022), yrs) && @warn(
         "TAXSIM 32 is a frozen 11/03/22 build with state law coded only through 2020, and it " *
         "returns materially different results from TAXSIM 35 for 2022 onward. Use taxsim35 " *
@@ -192,9 +223,8 @@ function taxsim_server_version(version::Integer = 35; connection = :ssh, timeout
         version == 35 ? TAXSIM35 :
         throw(ArgumentError("Only TAXSIM 32 and 35 are reachable; got $version"))
 
-    probe = DataFrame(taxsimid = [1], year = [2020], mstat = [1], idtl = [15])
-    raw = _submit(v, CSV.write(IOBuffer(), probe);
-                  connection = _normalize_connection(connection), timeout = timeout)
+    probe = (; taxsimid = [1], year = [2020], mstat = [1], idtl = [15])
+    raw = _submit(v, probe; connection = _normalize_connection(connection), timeout = timeout)
     for line in split(raw, '\n')
         occursin("NBER TAXSIM Model", line) && return String(strip(line))
     end
