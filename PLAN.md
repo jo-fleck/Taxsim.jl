@@ -475,7 +475,13 @@ taxsim32(df; full=false, long_names=false, mtr=:taxpayer, timeout=…, checks=tr
   trusting the server.
 - Return `taxsimid` in the input's type (§2.4k).
 
-### Phase 3 — Robustness, correctness, efficiency
+### Phase 3 — Robustness, correctness, efficiency — **DONE**
+
+Measured: the zero-copy `NamedTuple` allocates **1,208 bytes** of overhead on a million-row
+frame against **80,527,416** for the old `deepcopy` path, everything else being the
+unavoidable `idtl` vector. Submissions stream into the process and are never materialised.
+`output=path` for the response side remains deferred (§5).
+
 
 1. **Zero-copy payload.** Replace `deepcopy` + two `insertcols!` with a `NamedTuple` that
    *shares* the original column vectors:
@@ -513,7 +519,11 @@ taxsim32(df; full=false, long_names=false, mtr=:taxpayer, timeout=…, checks=tr
    branch on it.
 8. `fill(2, n)` over `2*ones(Int64, n)`; `pairs(eachcol(df))` over positional indexing.
 
-### Phase 4 — Tests
+### Phase 4 — Tests — **DONE**
+
+`test/record_fixtures.jl` reproduced the hand-recorded fixture bytes exactly. Aqua caught a
+missing `[compat]` entry for the `Test` extra on its first run — an AutoMerge prerequisite.
+
 
 - **Offline, default, deterministic.** Fixtures stored as **raw server bytes** — including
   the trailing comma and the `"   v21"` padding — never as parsed frames, which would have
@@ -540,7 +550,16 @@ taxsim32(df; full=false, long_names=false, mtr=:taxpayer, timeout=…, checks=tr
   **Skip JET.jl**: I/O-bound glue with no hot loops, version-sensitive against Julia
   internals, near-zero signal.
 
-### Phase 5 — CI and documentation
+### Phase 5 — CI and documentation — **DONE**
+
+One defect found that the plan had not: **`CompatHelper.yml` could never have run.** It
+calls `julia -e` with no `setup-julia` step, and hosted runners no longer ship a Julia.
+Fixed, and its cron moved from daily to weekly.
+
+The doctest step is kept and now has real content: `fips_to_taxsim` is pure and offline, so
+it is a genuine `jldoctest`. `checkdocs = :exported` scopes Documenter's check, since the
+internals carry docstrings for maintainers but are deliberately not in the manual.
+
 
 **CI** — every action version in revision 1 was at least one major behind:
 
@@ -688,3 +707,7 @@ items that need the maintainer's GitHub access.
 is not a skip. Added beyond the plan: `fips_to_taxsim` and an SOI range check (§1.8),
 local year/state coverage pre-flight, `taxsim_server_version`, DataFrame provenance metadata,
 and the typed error hierarchy.
+
+**Revision 5** (2026-09-22) — Phases 3, 4 and 5 implemented. Added beyond the plan: a
+scheduled canary workflow that opens an issue on drift, `.github/dependabot.yml` for the
+action versions, and the CompatHelper fix.

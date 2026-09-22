@@ -1,8 +1,7 @@
-[![Build Status](https://github.com/jo-fleck/Taxsim.jl/workflows/CI/badge.svg)](https://github.com/jo-fleck/Taxsim.jl/actions)
+[![Build Status](https://github.com/jo-fleck/Taxsim.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/jo-fleck/Taxsim.jl/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/jo-fleck/Taxsim.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jo-fleck/Taxsim.jl)
-
-<!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://jo-fleck.github.io/Taxsim.jl/stable)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://jo-fleck.github.io/Taxsim.jl/dev) -->
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://jo-fleck.github.io/Taxsim.jl/stable)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://jo-fleck.github.io/Taxsim.jl/dev)
 
 
 # Taxsim.jl

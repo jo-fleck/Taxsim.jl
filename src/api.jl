@@ -182,8 +182,8 @@ Compute federal and state income tax liabilities with [TAXSIM
 !!! warning "TAXSIM 32 is a frozen 2022 build"
     The hosted TAXSIM 32 calculator is dated 11/03/22 and its state tax law is coded only
     through 2020. It diverges materially from TAXSIM 35 for 2022 and 2023 — on one test record
-    (married joint, California, \$200,000 of wages) 2023 federal tax differs by over \$12,000
-    and the 2022 state marginal rate by 3.3 points.
+    (married joint, California, `\$200,000` of wages) 2023 federal tax differs by over
+    `\$12,000` and the 2022 state marginal rate by 3.3 points.
 
     `taxsim32` exists so that work published against this endpoint stays reproducible. For new
     work use [`taxsim35`](@ref).

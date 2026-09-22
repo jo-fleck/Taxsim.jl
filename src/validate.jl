@@ -142,6 +142,22 @@ expects. Accepts a number or any iterable; `0` and `missing` pass through unchan
 The two schemes agree only for Alabama and Alaska: FIPS 6 is California but SOI 6 is Colorado,
 so passing FIPS codes directly to `state` produces no error and the wrong state's tax.
 
+```jldoctest
+julia> fips_to_taxsim(6)          # FIPS California is SOI California
+5
+
+julia> fips_to_taxsim(6) == 6     # ... but not SOI 6, which is Colorado
+false
+
+julia> fips_to_taxsim([1, 4, 6])
+3-element Vector{Int64}:
+ 1
+ 3
+ 5
+```
+
+In practice:
+
 ```julia
 df.state = fips_to_taxsim(df.statefip)
 ```

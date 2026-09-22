@@ -1,15 +1,26 @@
 name: CompatHelper
+
 on:
   schedule:
-    - cron: 0 0 * * *
+    - cron: '0 0 * * 1'   # weekly; daily was noise
   workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   CompatHelper:
     runs-on: ubuntu-latest
     steps:
-      - name: Pkg.add("CompatHelper")
+      # Hosted runners no longer ship a Julia, so the previous version of this workflow - which
+      # called `julia -e` directly - could not have run.
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - name: Install CompatHelper
         run: julia -e 'using Pkg; Pkg.add("CompatHelper")'
-      - name: CompatHelper.main()
+      - name: Run CompatHelper
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMPATHELPER_PRIV: ${{ secrets.DOCUMENTER_KEY }}
