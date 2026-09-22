@@ -10,7 +10,9 @@
 
 [TAXSIM](https://taxsim.nber.org) is a program of the National Bureau of Economic Research (NBER) which calculates liabilities under US federal and state income tax laws. It can be accessed by uploading tax filer information to the NBER's TAXSIM server. The program then computes a number of variables (income taxes, tax credits, etc.) and returns them.
 
-`Taxsim.jl` exchanges data between the Julia workspace and the server. Its function `taxsim32` supports the latest [TAXSIM version 32](https://taxsim.nber.org/taxsim32/). Future versions will be included.
+`Taxsim.jl` exchanges data between the Julia workspace and the server. Its function `taxsim32` targets [TAXSIM version 32](https://taxsim.nber.org/taxsim32/).
+
+> **⚠️ TAXSIM 32 is a frozen 2022 build.** The hosted TAXSIM 32 calculator is dated 11/03/22 and its state tax law is coded only through 2020. It returns materially different results from TAXSIM 35 for 2022 and 2023 — on one test record, 2023 federal tax differs by over $12,000. `taxsim32` is retained so that published work computed against this endpoint stays reproducible; it is **not** a supported calculator for recent tax years. TAXSIM 35 support is in progress.
 
 #### Video Tutorial
 
@@ -41,14 +43,14 @@ Before using `taxsim32`, please make yourself familiar with [Internet TAXSIM 32]
 
 #### Keyword Arguments
 
-- `connection`: choose either `"SSH"` or `"FTP"`. `"SSH"` issues a system curl command while `"FTP"` uses the [FTPClient Package](https://github.com/invenia/FTPClient.jl). Defaults to `"SSH"` (which is faster).
+- `connection`: currently only `"SSH"`, which is also the default. `taxsim32` tries both NBER SSH hosts on ports 22 and 443, so it works on networks that block port 22. Passing `"FTP"` raises an explanatory error — NBER's FTP server still accepts uploads but no longer returns any results, and `FTPClient.jl` is unmaintained.
 - `full`: request the full list of TAXSIM return variables v1 to v45. Defaults to `false` which returns v1 to v9.
 - `long_names`: name all return variables with their long TAXSIM names. Defaults to `false` which returns abbreviated names for v1 to v9 and no names for v10 to v45.
 
 #### Output
 
 - Data frame with requested TAXSIM return variables. Column types are either Integer or Float.
-- If `df` does not include `state` or if `state = 0`, the data frame returned by a `full` request does not include v30 to v41.
+- A `full` request always returns every column the server sent. Earlier versions dropped v30 to v41 when no state was given; that was a client-side convenience which discarded a populated `v30`, and it has been removed.
 - Observations are ordered as in `df` so `hcat(df, df_output, makeunique=true)` merges all variables of the input and output data frames.
 
 ### Examples
@@ -70,7 +72,7 @@ df_small_output_default = taxsim32(df_small_input)
 ├─────┼──────────┼───────┼───────┼─────────┼─────────┼─────────┼─────────┼─────────┼─────────┤
 │ 1   │ 0.0      │ 1980  │ 0     │ 10920.0 │ 0.0     │ 0.0     │ 20.0    │ 0.0     │ 12.0    │
 
-df_small_output_full = taxsim32(df_small_input, connection="FTP", full=true)
+df_small_output_full = taxsim32(df_small_input, full=true)
 1×29 DataFrame
 │ Row │ taxsimid │ year  │ state │ fiitax  │ siitax  │ fica    │ frate   │ srate   │ ficar   │ v10     │ v11     │ ... | v29     │ v42     │ ... | v45     │
 │     │ Float64  │ Int64 │ Int64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ Float64 │ ... │ Float64 │ Float64 | ... | Float64 |
@@ -106,12 +108,13 @@ df_small_stateN_out = taxsim32(df_small_stateN)
 Expect three different kinds of errors
 
 1. **Input Error** Adjust `df` so it meets the required column types and names.
-2. **Connection Error** Indicates that `taxsim32` cannot connect to the TAXSIM server. Try a different connection option. If this does not help, check your internet and network settings and contact your network administrator - you're probably behind a restrictive firewall.
+2. **Connection Error** Indicates that `taxsim32` cannot reach the TAXSIM server. The error names every host and port tried. If all of them failed, check your internet and network settings and contact your network administrator - you're probably behind a restrictive firewall.
 3. **Server Error** Returned from the TAXSIM server (error message begins with "TAXSIM: ... "). Either a faulty `df` passed the input tests or TAXSIM cannot compute the tax variables for some other reason which the error message hopefully helps to identify. Example: "TAXSIM: Non-joint return with 2 wage-earners"
 
 Please file an issue if you experience problems with large input data frames (server non-response, truncated return data frames, etc).
 
 ### Scheduled Updates
 
-- `taxsim32` currently returns marginal tax rates computed with respect to taxpayer earnings. Marginal rates for "Wage Income", "Spouse Earning", etc. will be included as keyword options in future releases.
-- HTTP connection will be included as another connection option in future releases.
+See [PLAN.md](PLAN.md) for the full roadmap to v1.0.0. In progress: TAXSIM 35 support, marginal
+rates with respect to margins other than taxpayer earnings (`mtr`), and an HTTP fallback
+transport.
