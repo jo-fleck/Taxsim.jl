@@ -1,0 +1,9 @@
+taxsimid,year,state,fiitax,siitax,fica,frate,srate,ficar
+ TAXSIM: Federal tax calculator available 1960 - 2023 only.
+ TAXSIM: Record ID                :   1.0000000000000000     
+ TAXSIM: Logical Record Number    :           1
+ TAXSIM: Law Year                 :   2025.0000000000000     
+ TAXSIM: State id                 :   0.0000000000000000     
+ TAXSIM: Data record, as converted:           1        2025           0           2           0           0           0           0           0           0      100000           0           0           0           0           0           0           0           0           0           0           0           0           0           0           0           0           0           0           0           0           0
+ TAXSIM: Abandoning processing    :          14
+ TAXSIM: Taxsim32 version of      : 11/03/22
