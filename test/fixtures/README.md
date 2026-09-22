@@ -29,4 +29,16 @@ TAXSIM 35 = `03/22/24` (state law through 2021). Both are frozen builds and NBER
 without version bumps, so if these fixtures ever stop matching the live server, that is a
 real change to investigate, not a test to relax.
 
-Re-record with `TAXSIM_LIVE_TESTS=true` and the commands in this file's git history.
+Each `.csv` has a `.toml` sidecar recording what was submitted, how many header and row fields
+came back, and which server build answered. The test suite checks that every fixture has a
+sidecar and that the recorded shape matches the bytes on disk, so a hand-edited fixture is
+caught.
+
+Re-record everything with:
+
+```
+julia --project=. test/record_fixtures.jl
+```
+
+Run that when a live canary test fails, then review `git diff test/fixtures`. A change in the
+recorded bytes is a change on NBER's side, not a test to relax.

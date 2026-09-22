@@ -3,6 +3,8 @@ using Test
 using DataFrames
 using CSV
 using Tables
+using Aqua
+using TOML
 
 const T = Taxsim
 const FIX = joinpath(@__DIR__, "fixtures")
@@ -16,6 +18,30 @@ replay(name) = (v, payload; kwargs...) -> fixture(name)
 const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
 
 @testset "Taxsim.jl" begin
+
+    @testset "package quality (Aqua)" begin
+        # Catches stale or undeclared dependencies - which is exactly how the unused FTPClient
+        # would have been flagged - plus missing [compat] entries, which are a prerequisite for
+        # registration in General. Better as a local test failure than a registration rejection.
+        Aqua.test_all(Taxsim; ambiguities = false)
+    end
+
+    @testset "fixture sidecars" begin
+        # Every fixture must have a sidecar, and the sidecar's recorded shape must match the
+        # bytes actually on disk - so a hand-edited fixture is caught.
+        csvs = filter(f -> endswith(f, ".csv"), readdir(FIX))
+        @test !isempty(csvs)
+        for f in csvs
+            side = joinpath(FIX, replace(f, ".csv" => ".toml"))
+            @test isfile(side)
+            meta = TOML.parsefile(side)
+            lines = [l for l in split(replace(fixture(f), "\r\n" => "\n"), '\n') if !isempty(strip(l))]
+            @test meta["header_fields"] == count(==(','), lines[1]) + 1
+            length(lines) >= 2 && @test meta["row_fields"] == count(==(','), lines[2]) + 1
+            @test occursin("NBER TAXSIM Model", meta["server_banner"])
+            @test meta["taxsim_version"] in (32, 35)
+        end
+    end
 
     @testset "version data" begin
         @test length(T.TAXSIM32_VARS) == 36
