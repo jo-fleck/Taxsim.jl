@@ -395,7 +395,8 @@ No new architecture. Just make it correct and green offline:
 8. Drop `silencewarnings=true`.
 9. Tests: delete the FTP testsets, derive counts from constants, gate network tests.
 
-### Phase 1 — Refactor (NOT a version-parameterized framework)
+### Phase 1 — Refactor (NOT a version-parameterized framework) — **DONE** (`Phase 1+2`)
+
 
 Review consensus, twice over: **`TaxsimSpec` with quirk flags is over-engineering, and the
 generic approach is also more robust.** §1.4 is the argument against it — v35 *interleaves*
@@ -432,7 +433,16 @@ Instead:
   (`v30` is populated), and it is the source of §2.4i and §2.4j. There is no
   `drop_state_columns` kwarg — results always carry what the server sent.
 
-### Phase 2 — Public API
+### Phase 2 — Public API — **DONE**
+
+86 offline tests, 102 with `TAXSIM_LIVE_TESTS=true`. `src/taxsim32.jl` is replaced by
+`errors.jl`, `versions.jl`, `validate.jl`, `transport.jl`, `output.jl` and `api.jl`.
+
+One measured correction to §1.6: **`mtr = 0` does not skip the marginal-rate pass.**
+Submitted on its own it returns exactly what omitting `mtr` returns. The "straight
+throughput win" attributed to it in review does not hold, and the docs say so rather than
+repeating the claim. The other nine margins are confirmed, including per-record vectors.
+
 
 ```julia
 taxsim35(df; full=false, long_names=false, mtr=:taxpayer, timeout=…, checks=true, connection=:ssh)
@@ -673,3 +683,8 @@ revision 1:
 **Revision 3** (2026-09-22) — decisions D1, D6, D7 and D8 confirmed by the maintainer. The
 state-column drop is now removed outright rather than optionally retained, and §6 records the
 items that need the maintainer's GitHub access.
+
+**Revision 4** (2026-09-22) — Phases 1 and 2 implemented. `mtr = 0` corrected (§1.6): it
+is not a skip. Added beyond the plan: `fips_to_taxsim` and an SOI range check (§1.8),
+local year/state coverage pre-flight, `taxsim_server_version`, DataFrame provenance metadata,
+and the typed error hierarchy.
