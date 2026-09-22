@@ -98,6 +98,23 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
         # SOI code range, with the FIPS trap named
         e = bad(() -> taxsim35(DataFrame(year=2015, mstat=2, state=99)))
         @test e isa TaxsimInputError && occursin("FIPS", e.msg)
+
+        # spouse wages / spouse age on a non-joint return - TAXSIM abandons the record.
+        # Verified against both endpoints: ONLY swages and sage are policed this way.
+        for m in (1, 6, 8)
+            e = bad(() -> taxsim35(DataFrame(year=[2019], mstat=[m], pwages=[50000], swages=[20000])))
+            @test e isa TaxsimInputError && occursin("mstat", e.msg)
+            e = bad(() -> taxsim35(DataFrame(year=[2019], mstat=[m], pwages=[50000], sage=[40])))
+            @test e isa TaxsimInputError
+        end
+        @test T._check_input(DataFrame(year=[2019], mstat=[2], pwages=[50000], swages=[20000]), T.TAXSIM35) === nothing
+        @test T._check_input(DataFrame(year=[2019], mstat=[1], pwages=[50000], swages=[0]), T.TAXSIM35) === nothing
+        # these ARE accepted by the server on a non-joint return, so must not be rejected here
+        for v in (:ssemp, :sui, :sbusinc, :sprofinc)
+            d = DataFrame(year=[2019], mstat=[1], pwages=[50000])
+            d[!, v] = [20000]
+            @test T._check_input(d, T.TAXSIM35) === nothing
+        end
     end
 
     @testset "fips_to_taxsim" begin
@@ -239,6 +256,33 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
         @test occursin("1980,2,0,", zeroed)
         # a column with no missings is still shared, not rebuilt
         @test T._table(dm, T.TAXSIM35, false, T.DEFAULT_MTR, :zero).year === dm.year
+    end
+
+    @testset "transport failure classification" begin
+        v = T.TAXSIM35
+
+        # A rejected record is a server error, not a transport failure. TAXSIM writes `STOP n`
+        # to stderr and an unprefixed diagnostic to stdout, so checking stdout alone made a bad
+        # record look like a dead endpoint - and the payload was resubmitted to every remaining
+        # host and port, then over HTTP.
+        e = try T._raise_if_server_rejected(v, " Bad mstat   9.0000  x= 1.0", "STOP 4"); catch e; e end
+        @test e isa TaxsimServerError && occursin("Bad mstat", e.msg)
+        e = try T._raise_if_server_rejected(v, " TAXSIM: Federal tax calculator available 1960 - 2023 only.", ""); catch e; e end
+        @test e isa TaxsimServerError
+        e = try T._raise_if_server_rejected(v, "", " TAXSIM: Non-joint return with spousal income"); catch e; e end
+        @test e isa TaxsimServerError
+
+        # ... and must not fire on a good response or on ssh's own chatter
+        @test T._raise_if_server_rejected(v, "taxsimid,year\n1,1980\n", "") === nothing
+        @test T._raise_if_server_rejected(v, "taxsimid,year\n1,1980\n",
+                  "Warning: Permanently added 'taxsimssh.nber.org' (ED25519) to the list of known hosts.") === nothing
+        @test T._raise_if_server_rejected(v, "", "") === nothing
+
+        # curl exits 0 on a 404, so an HTML error page arrives looking like a response
+        @test T._looks_like_html("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\">\n<html>")
+        @test T._looks_like_html("\n  <html><head><title>404</title>")
+        @test !T._looks_like_html("taxsimid,year,state\n1.,1980,0\n")
+        @test !T._looks_like_html("")
     end
 
     @testset "connection argument" begin

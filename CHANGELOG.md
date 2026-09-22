@@ -43,6 +43,11 @@ change on their side — use `taxsim_server_version()` to record which build pro
 - **`missing_action = :zero`** sends zeros for `missing` values, which is how TAXSIM treats
   absent inputs anyway. The default remains `:error`.
 - **`timeout`**, enforced by a watchdog. `ConnectTimeout` covers only the SSH handshake.
+- Input is checked for **spouse wages or a spouse age on a non-joint return**, which TAXSIM
+  abandons the record over. This is the most common way a survey extract fails partway
+  through a large job. Verified against both endpoints that only `swages` and `sage` are
+  policed this way — `ssemp`, `sui`, `sbusinc` and `sprofinc` are accepted with
+  `mstat != 2`, so they are deliberately not rejected.
 - Any **Tables.jl** source is accepted, not only a `DataFrame`.
 - SSH now tries both NBER hosts on ports 22 and 443.
 

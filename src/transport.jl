@@ -52,6 +52,36 @@ _looks_like_server_message(s::AbstractString) =
     occursin("TAXSIM:", s) || occursin(r"^\s*STOP\b"m, s)
 
 """
+    _raise_if_server_rejected(v, out, err)
+
+Raise a [`TaxsimServerError`](@ref) when either stream carries a TAXSIM diagnostic, so the
+caller is told what the server objected to instead of watching the same rejected payload be
+retried against every other endpoint.
+"""
+function _raise_if_server_rejected(v::TaxsimVersion, out::AbstractString, err::AbstractString)
+    (_looks_like_server_message(out) || _looks_like_server_message(err)) || return nothing
+
+    lines = filter(!isempty, strip.(split(string(out, "\n", err), '\n')))
+    # The diagnostic often repeats on both streams; keep it readable.
+    shown = first(unique(lines), 12)
+    throw(TaxsimServerError("TAXSIM $(v.number) rejected the submission:\n  " *
+                            join(map(l -> first(l, 200), shown), "\n  ")))
+end
+
+"""
+    _looks_like_html(s)
+
+`curl` exits 0 on a 404, so an HTTP error page arrives looking like a successful response.
+Without this check a proxy error, a captive portal or a moved endpoint would be handed to the
+CSV parser and surface as a baffling width mismatch instead of a transport failure.
+"""
+function _looks_like_html(s::AbstractString)
+    t = lstrip(s)
+    isempty(t) && return false
+    return startswith(t, "<") || occursin(r"<html"i, first(t, 500))
+end
+
+"""
     _submit_ssh(v, table; timeout) -> String
 
 Try both NBER hosts on ports 22 and 443, first success wins. Port 443 matters for networks
@@ -71,7 +101,11 @@ function _submit_ssh(v::TaxsimVersion, table; timeout = DEFAULT_TIMEOUT)
         cmd = `ssh -p $port -T -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new $(v.account)@$host`
         out, err, ok = _run_stream(cmd, table, timeout)
 
-        _looks_like_server_message(out) && return out
+        # A server rejection is NOT a transport failure. TAXSIM aborts with a Fortran `STOP n`
+        # on stderr while its diagnostic may land on either stream, so both must be inspected:
+        # checking stdout alone made a bad record look like a dead endpoint, and the payload was
+        # then resubmitted to every remaining host and port and finally over HTTP.
+        _raise_if_server_rejected(v, out, err)
         (ok && !isempty(strip(out))) && return out
 
         detail = isempty(strip(err)) ? "returned an empty response" :
@@ -102,7 +136,14 @@ function _submit_http(v::TaxsimVersion, table; timeout = DEFAULT_TIMEOUT)
         cmd = `curl -sS --max-time $timeout -F txpydata=@$path $(v.http_url)`
         out, err, ok = _run_stream(cmd, nothing, timeout + 5)
 
-        _looks_like_server_message(out) && return out
+        if _looks_like_html(out)
+            first_line = first(something(findfirst(!isempty, strip.(split(out, '\n'))), 1), 1)
+            throw(TaxsimTransportError(
+                "$(v.http_url) returned an HTML page rather than TAXSIM output — the endpoint " *
+                "may have moved, or a proxy intercepted the request. Response began: " *
+                first(replace(strip(out), '\n' => " "), 160)))
+        end
+        _raise_if_server_rejected(v, out, err)
         (ok && !isempty(strip(out))) && return out
         throw(TaxsimTransportError("HTTP submission to $(v.http_url) failed: " *
                                    (isempty(strip(err)) ? "empty response" : strip(err))))

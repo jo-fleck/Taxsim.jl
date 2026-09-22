@@ -109,6 +109,26 @@ function _check_coverage(cols, v::TaxsimVersion)
         end
     end
 
+    # TAXSIM aborts a record that reports spouse wages or a spouse age on a non-joint return,
+    # which is the most common way a survey extract fails partway through a large job. Measured
+    # on both v32 and v35: only `swages` and `sage` are policed this way - `ssemp`, `sui`,
+    # `sbusinc` and `sprofinc` are all accepted with mstat != 2, so they are deliberately not
+    # checked here. Do not widen this without re-probing the server.
+    if "mstat" in names_
+        ms = col("mstat")
+        for (var, label) in (("swages", "spouse wages"), ("sage", "spouse age"))
+            var in names_ || continue
+            vals = col(var)
+            bad = findall(i -> !ismissing(ms[i]) && !ismissing(vals[i]) &&
+                               ms[i] != 2 && vals[i] != 0, eachindex(ms))
+            isempty(bad) || throw(TaxsimInputError(
+                "`$var` ($label) must be 0 unless `mstat` is 2 (married filing jointly) — " *
+                "TAXSIM abandons the record otherwise. Offending row(s): " *
+                join(first(bad, 5), ", ") * (length(bad) > 5 ? ", …" : "") * ". " *
+                "(TAXSIM does accept ssemp, sui, sbusinc and sprofinc on a non-joint return.)"))
+        end
+    end
+
     if "state" in names_
         bad = unique(s for s in col("state") if !ismissing(s) && !(0 <= s <= MAX_STATE_CODE))
         isempty(bad) || throw(TaxsimInputError(
