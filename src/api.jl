@@ -66,6 +66,18 @@ function _table(x, v::TaxsimVersion, full::Bool, mtr, missing_action::Symbol = :
     return (; prepared...)
 end
 
+"""
+    _expected_rows(table, n) -> Int
+
+How many result rows a submission should produce. Normally one per record, but each record
+with `state = $(ALL_STATES)` expands to $(N_STATES) rows — one per state — so a plain
+count would read that expansion as a truncated response.
+"""
+function _expected_rows(table, n::Int)
+    haskey(table, :state) || return n
+    return sum(s -> (!ismissing(s) && s == ALL_STATES) ? N_STATES : 1, table.state; init = 0)
+end
+
 "Serialise a submission, for the HTTP transport and for tests that assert payload bytes."
 _payload_string(table) = String(take!(CSV.write(IOBuffer(), table)))
 
@@ -95,13 +107,14 @@ function _taxsim(x, v::TaxsimVersion; full = false, long_names = false, mtr = DE
 
     table = _table(x, v, full, mtr, missing_action)
     n_in = length(table.idtl)
+    n_expected = _expected_rows(table, n_in)
 
     raw = _transport(v, table; connection = conn, timeout = timeout)
     df_res = CSV.read(IOBuffer(_normalize(raw)), DataFrame; delim = ',')
 
-    nrow(df_res) == n_in || throw(TaxsimServerError(
-        "Sent $n_in records but TAXSIM returned $(nrow(df_res)). The response was " *
-        "truncated; do not use these results."))
+    nrow(df_res) == n_expected || throw(TaxsimServerError(
+        "Sent $n_in record(s), expected $n_expected result row(s), but TAXSIM returned " *
+        "$(nrow(df_res)). The response was truncated; do not use these results."))
 
     _restore_taxsimid!(df_res, x)
     long_names && _apply_long_names!(df_res)
@@ -149,6 +162,10 @@ Compute federal and state income tax liabilities with [TAXSIM
 `df` may be a `DataFrame` or any other Tables.jl source with at least one row, whose columns are
 named exactly as in NBER's TAXSIM 35 variable list (45 names; order does not matter). Unsupplied variables are treated as
 zero by the server. `missing` values are rejected, naming the offending rows.
+
+Set `state = -1` to compute a record for **every** state: it comes back as 51 rows, states 1
+through 51, each carrying the submitted `taxsimid`. Note this means the output no longer lines
+up row-for-row with the input, so `hcat` is not appropriate.
 
 !!! warning "state uses SOI codes, not FIPS"
     TAXSIM numbers states 1 Alabama, 2 Alaska, 3 Arizona, 4 Arkansas, 5 California, … CPS, ACS

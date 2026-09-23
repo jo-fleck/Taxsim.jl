@@ -95,6 +95,12 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
         e = bad(() -> taxsim35(DataFrame(year=[1970], mstat=[2], state=[5])))
         @test e isa TaxsimInputError && occursin("1977", e.msg)
         @test T._check_input(DataFrame(year=[1970], mstat=[2], state=[0]), T.TAXSIM35) === nothing
+        # `state = -1` asks for every state and is valid. Regression: 1.0.0 rejected it here
+        # AND would have failed the row-count check, breaking a feature 0.3.1 supported.
+        @test T._check_input(DataFrame(year=[2015], mstat=[2], state=[-1]), T.TAXSIM35) === nothing
+        @test T._check_input(DataFrame(year=[2015,2015], mstat=[2,2], state=[-1,5]), T.TAXSIM35) === nothing
+        @test_throws TaxsimInputError T._check_input(DataFrame(year=[2015], mstat=[2], state=[-2]), T.TAXSIM35)
+
         # SOI code range, with the FIPS trap named
         e = bad(() -> taxsim35(DataFrame(year=2015, mstat=2, state=99)))
         @test e isa TaxsimInputError && occursin("FIPS", e.msg)
@@ -146,6 +152,13 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
         # mtr may vary per record
         @test last_col(pay(three; mtr=[:taxpayer, :interest, :none])) == ["0", "0", "10"]
         @test [split(l, ',')[end-1] for l in split(chomp(pay(three; mtr=[:taxpayer,:interest,:none])), '\n')[2:end]] == ["85", "14", "0"]
+
+        # a state = -1 record expands to 51 result rows, so the expected count must too
+        @test T._expected_rows((; idtl=[10]), 1) == 1
+        @test T._expected_rows((; state=[-1], idtl=[10]), 1) == 51
+        @test T._expected_rows((; state=[-1,-1], idtl=[0,10]), 2) == 102
+        @test T._expected_rows((; state=[-1,5], idtl=[0,10]), 2) == 52
+        @test T._expected_rows((; state=[5,5], idtl=[0,10]), 2) == 2
 
         @test_throws TaxsimInputError T._table(three, T.TAXSIM35, false, [:taxpayer])
         @test_throws TaxsimInputError T._table(three, T.TAXSIM35, false, :nonsense)
@@ -355,6 +368,18 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
             N = 100
             dfN = DataFrame(year=fill(1980,N), mstat=fill(2,N), ltcg=fill(100000,N), state=fill(1,N))
             @test nrow(taxsim35(dfN, full=true)) == N
+        end
+
+        @testset "live: state = -1 expands to every state" begin
+            o = taxsim35(DataFrame(taxsimid=[7], year=[2015], mstat=[2], pwages=[80000], state=[-1]))
+            @test nrow(o) == 51
+            @test sort(o.state) == collect(1:51)
+            @test all(==(7), o.taxsimid)             # the submitted id is carried through
+            @test nrow(taxsim35(DataFrame(year=[2015], mstat=[2], pwages=[80000], state=[-1]), full=true)) == 51
+            # mixed submissions
+            m = DataFrame(year=[2015,2015], mstat=[2,2], pwages=[80000,90000], state=[-1,5])
+            @test nrow(taxsim35(m)) == 52
+            @test nrow(taxsim32(m)) == 52
         end
 
         @testset "live: mtr margins" begin

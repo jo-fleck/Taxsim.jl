@@ -130,12 +130,13 @@ function _check_coverage(cols, v::TaxsimVersion)
     end
 
     if "state" in names_
-        bad = unique(s for s in col("state") if !ismissing(s) && !(0 <= s <= MAX_STATE_CODE))
+        bad = unique(s for s in col("state")
+                     if !ismissing(s) && s != ALL_STATES && !(0 <= s <= MAX_STATE_CODE))
         isempty(bad) || throw(TaxsimInputError(
-            "`state` must be an SOI code between 0 and $MAX_STATE_CODE, but contains " *
-            "$(join(sort(collect(bad)), ", ")). Note TAXSIM uses SOI codes (1 Alabama, " *
-            "2 Alaska, 3 Arizona, 4 Arkansas, 5 California, …), NOT FIPS codes — see " *
-            "`fips_to_taxsim`."))
+            "`state` must be an SOI code between 0 and $MAX_STATE_CODE (or $ALL_STATES for " *
+            "every state), but contains $(join(sort(collect(bad)), ", ")). Note TAXSIM uses " *
+            "SOI codes (1 Alabama, 2 Alaska, 3 Arizona, 4 Arkansas, 5 California, …), NOT " *
+            "FIPS codes — see `fips_to_taxsim`."))
     end
     return nothing
 end

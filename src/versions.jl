@@ -61,6 +61,12 @@ const FEDERAL_YEARS = 1960:2023
 const STATE_FIRST_YEAR = 1977      # "state must be zero if year is before 1977"
 const MAX_STATE_CODE = 51          # SOI codes run 1 (Alabama) to 51 (Wyoming); 0 means no state
 
+# `state = -1` asks TAXSIM to compute the record for every state: one submitted record
+# comes back as 51 rows, states 1 through 51, all carrying the submitted `taxsimid`.
+# Undocumented on NBER's pages but supported by both v32 and v35.
+const ALL_STATES = -1
+const N_STATES = 51
+
 # Long labels keyed by the column name the server returns. Renaming by name rather than by
 # position means an unrecognised column keeps the server's own name instead of shifting every
 # label after it.

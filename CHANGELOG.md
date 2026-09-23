@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.1
+
+### Fixed
+
+- **`state = -1` works again.** Submitting `-1` asks TAXSIM to compute a record for every
+  state, returning 51 rows. v1.0.0 broke this twice over: the new state range check rejected
+  `-1` outright, and the new row-count assertion read the 51-row response as a truncated reply
+  to a 1-row submission. Both guards were individually reasonable and together they removed a
+  feature v0.3.1 supported. The expected row count now accounts for the expansion, and the
+  behaviour is documented and covered by tests.
+
 ## v1.0.0
 
 First release since 2021. The package did not work on current Julia before this release.

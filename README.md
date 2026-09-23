@@ -84,6 +84,15 @@ FIPS codes — which CPS, ACS and IPUMS all ship — have gaps: `4 Arizona, 5 Ar
 df.state = fips_to_taxsim(df.statefip)
 ```
 
+**`state = -1` computes every state.** A single record submitted with `state = -1` comes back as
+51 rows — states 1 through 51 — all carrying the submitted `taxsimid`. Useful for comparing a
+household across state tax regimes. Note the output then has more rows than the input, so the
+`hcat` merge pattern does not apply.
+
+```julia
+taxsim35(DataFrame(year = 2015, mstat = 2, pwages = 80_000, state = -1))   # 51 rows
+```
+
 ### ⚠️ TAXSIM 32 is a frozen 2022 build
 
 The hosted TAXSIM 32 calculator is dated 11/03/22 and its state tax law is coded only through 2020. It diverges materially from TAXSIM 35 for recent years. Married joint, California, $200,000 of wages:
