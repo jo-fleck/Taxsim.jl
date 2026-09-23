@@ -1,0 +1,9 @@
+# Without this, the workflow actions drift silently. They were three major versions behind
+# when this package was picked back up in 2026.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies]
