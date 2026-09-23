@@ -87,13 +87,16 @@ end
 Try both NBER hosts on ports 22 and 443, first success wins. Port 443 matters for networks
 that block 22.
 """
-function _submit_ssh(v::TaxsimVersion, table; timeout = DEFAULT_TIMEOUT)
+function _submit_ssh(v::TaxsimVersion, table; timeout = DEFAULT_TIMEOUT,
+                     hosts = SSH_HOSTS, ports = SSH_PORTS)
     Sys.which("ssh") === nothing && throw(TaxsimTransportError(
         "No `ssh` executable on PATH. On Windows, enable OpenSSH under " *
         "Apps > Optional Features, or pass connection = :http."))
 
     failures = String[]
-    for port in SSH_PORTS, host in SSH_HOSTS
+    # `hosts`/`ports` are overridable so the retry-and-report path can be tested offline
+    # against a closed local port instead of waiting out four real connection timeouts.
+    for port in ports, host in hosts
         # NOTE: do not add `-o BatchMode=yes` or `-o NumberOfPasswordPrompts=0`. The NBER
         # accounts authenticate by keyboard-interactive with an empty response, and either
         # option disables that path and breaks the connection outright. Hang protection is the

@@ -285,6 +285,39 @@ const LIVE = get(ENV, "TAXSIM_LIVE_TESTS", "") == "true"
         @test !T._looks_like_html("")
     end
 
+    @testset "transport failure paths (offline)" begin
+        # These are the paths the two pre-release bugs lived in. They were verified by hand
+        # during validation but nothing in the suite covered them, so a regression would have
+        # gone unnoticed. All of these run without touching the network.
+
+        # the watchdog: ConnectTimeout only covers the handshake, so a stalled transfer needs
+        # an external kill or Julia blocks indefinitely
+        el = @elapsed begin
+            out, err, ok = T._run_stream(`sleep 30`, nothing, 2)
+            @test !ok
+            @test occursin("timed out", err)
+            @test isempty(out)
+        end
+        @test el < 10          # killed at ~2s, not run to completion at 30s
+
+        # a command that cannot be spawned at all is reported, not thrown through
+        out, err, ok = T._run_stream(`__taxsim_no_such_executable__`, nothing, 5)
+        @test !ok && isempty(out) && !isempty(err)
+
+        # every endpoint failing is a transport error that names each attempt. Port 1 on
+        # localhost refuses immediately, so this costs nothing.
+        e = try
+            T._submit_ssh(T.TAXSIM35, (; taxsimid=[1], year=[1980], mstat=[2], idtl=[10]);
+                          timeout=20, hosts=("127.0.0.1",), ports=(1, 2))
+        catch e; e end
+        @test e isa TaxsimTransportError
+        @test occursin("127.0.0.1:1", e.msg) && occursin("127.0.0.1:2", e.msg)
+        @test occursin("Cannot reach TAXSIM 35 over SSH", e.msg)
+
+        # an unrecognised transport is rejected at the dispatch point
+        @test_throws ArgumentError T._submit(T.TAXSIM35, (; idtl=[10]); connection=:carrier_pigeon)
+    end
+
     @testset "connection argument" begin
         @test T._normalize_connection(:ssh) === :ssh
         @test T._normalize_connection(:http) === :http
